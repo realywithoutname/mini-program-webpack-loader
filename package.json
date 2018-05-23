@@ -1,0 +1,21 @@
+{
+  "name": "mini-program-webpack-loader",
+  "version": "0.0.7",
+  "description": "mini-program webpack loader",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "npx babel src --out-dir lib",
+    "test": "echo \"just demo\" && exit 1"
+  },
+  "keywords": [
+    "webpack",
+    "mini-program"
+  ],
+  "author": "youzan",
+  "license": "ISC",
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel": "^6.23.0",
+    "babel-preset-env": "^1.7.0"
+  }
+}
