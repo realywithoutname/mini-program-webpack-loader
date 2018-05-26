@@ -50,6 +50,7 @@ class MiniLoader {
     return this.loadDeps(reg)
       .then(map => {
         let depsPromise = []
+        let deps = []
         let code = this.source
         for (const value of map.values()) {
           code = code.replaceAll(value.origin, value.replace)
@@ -61,7 +62,11 @@ class MiniLoader {
           depsPromise.push(
             this.addDepsModule(value.sourcePath)
           )
+
+          deps.push(value.sourcePath)
         }
+        
+        this.$plugin.addListenFiles(deps)
 
         return Promise.all(depsPromise)
           .catch((err) => {
@@ -75,10 +80,17 @@ class MiniLoader {
 
   async jsonParser() {
     let json = JSON.parse(this.source)
-    let usingComponents = json.usingComponents
+    let { usingComponents, pages = [], subPackages = [] } = json
+    
+    if (pages.length || subPackages.length) {
+      this.$plugin.appJsonChange(json, this.resourcePath)
+      return this.source
+    }
+
     if (!usingComponents) return this.source
 
     let assets = []
+    let components = []
     for (const key in usingComponents) {
       let component = usingComponents[key] + '.json'
 
@@ -88,18 +100,15 @@ class MiniLoader {
       // 获取依赖的实际文件列表
       let dir = path.dirname(absPath)
       let name = path.basename(absPath, '.json')
-
-      let files = utils.getPagePaths(dir, name)
-      assets.push(
-        ...utils.getPagePaths(dir, name)
-      )
-
+      
+      assets = assets.concat(utils.getFiles(dir, name))
+      components.push(dir)
       // 获取相对路径，返回到 json 文件中
       let relPath = this.getRelativePath(absPath)
       usingComponents[key] = relPath.substr(0, relPath.length - 5)
     }
 
-    this.$plugin.newFileEntry(assets)
+    this.$plugin.addNewConponentFiles(assets, components)
     return JSON.stringify(json, null, 2)
   }
 
