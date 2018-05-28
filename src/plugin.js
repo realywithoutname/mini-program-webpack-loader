@@ -175,6 +175,7 @@ class MiniPlugin {
       delete code[entry];
     });
 
+    code.pages = [...new Set(code.pages)]
     Object.keys(code).forEach(() => {
       if (!code.key) delete code.key;
     });
