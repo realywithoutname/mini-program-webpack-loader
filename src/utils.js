@@ -73,3 +73,14 @@ exports.getFiles = (base, path = '', exts) => {
 
   return files
 }
+
+/**
+ * 扁平数组
+ * @param {Array} arr 输入数组
+ */
+exports.flattenDeep = (arr) => {
+  while (arr.some(item => Array.isArray(item))) {
+    arr = [].concat(...arr);
+  }
+  return arr;
+};

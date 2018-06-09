@@ -80,34 +80,58 @@ class MiniLoader {
 
   async jsonParser() {
     let json = JSON.parse(this.source)
-    let { usingComponents, pages = [], subPackages = [] } = json
+    let { componentGenerics, usingComponents, pages = [], subPackages = [] } = json
     
     if (pages.length || subPackages.length) {
       this.$plugin.appJsonChange(json, this.resourcePath)
       return this.source
     }
 
-    if (!usingComponents) return this.source
+    if (!usingComponents && !componentGenerics) return this.source
 
     let assets = []
     let components = []
-    for (const key in usingComponents) {
-      let component = usingComponents[key] + '.json'
 
+    async function setConponentFiles (component) {
+      component = component + '.json'
+  
       // 获取自定义组件的绝对路径
       let absPath = await this.resolve(this.context, component)
-
+  
       // 获取依赖的实际文件列表
       let dir = path.dirname(absPath)
       let name = path.basename(absPath, '.json')
       
+      // 新增到编译的组件以及组件对应的文件
       assets = assets.concat(utils.getFiles(dir, name))
       components.push(dir)
       // 获取相对路径，返回到 json 文件中
       let relPath = this.getRelativePath(absPath)
-      usingComponents[key] = relPath.substr(0, relPath.length - 5)
+      return relPath.substr(0, relPath.length - 5)
     }
 
+    /**
+     * 自定义组件
+     */
+    for (const key in usingComponents || {}) {
+      usingComponents[key] = await setConponentFiles.call(this, usingComponents[key])
+    }
+
+    /**
+     * 抽象组件
+     */
+    for (const key in componentGenerics) {
+      if (typeof componentGenerics[key] === 'object') {
+        for (const _key in componentGenerics[key]) {
+          let element = componentGenerics[key][_key];
+          componentGenerics[key][_key] = await setConponentFiles.call(this, element)
+        }
+      }
+    }
+
+    /**
+     * 通知插件，下次编译的时候要把这些文件加到编译中
+     */
     this.$plugin.addNewConponentFiles(assets, components)
     return JSON.stringify(json, null, 2)
   }

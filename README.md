@@ -16,7 +16,10 @@
 ### 插件
 - MiniPlugin
   - 参数
-    - extfile `true` 是否需要打包 ext.json
+    - extfile
+      - `true` 打包主包下的 ext.json
+      - `false` 不打包 ext.json
+      - `string` extfile 文件路径
 
 插件主要做了以下几件事情：
 - 小程序项目的 Page 文件加载
@@ -78,3 +81,6 @@ loader 主要做了以下几件事情：
       border: $border solid #000;
     }
   ~~~
+
+### 可能存在 bug
+1. 多个项目，入口文件都是 app.json 可能导致 wxss 合并不对

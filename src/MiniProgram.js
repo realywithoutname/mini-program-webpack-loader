@@ -1,12 +1,4 @@
-const colors = require('colors');
-const loader = require('./loader');
-const utils = require('./utils');
-require('console.table');
-
-const {
-  existsSync
-} = require('fs');
-
+const { existsSync } = require('fs');
 const {
   dirname,
   join,
@@ -15,30 +7,21 @@ const {
   basename,
   isAbsolute
 } = require('path');
+const { ConcatSource, RawSource } = require('webpack-sources');
 const MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin');
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
 
-const {
-  ConcatSource,
-  RawSource
-} = require('webpack-sources');
+const { flattenDeep, getFiles } = require('./utils')
 
-const Template = require('webpack/lib/Template');
+const mainChunkNameTemplate = '__assets_chunk_name__'
+let mainChunkNameIndex = 0
 
-const MiniTemplate = require('./MiniTemplate');
-
-const flattenDeep = (arr) => {
-  while (arr.some(item => Array.isArray(item))) {
-    arr = [].concat(...arr);
-  }
-  return arr;
-};
-
-class MiniPlugin {
+module.exports = class MiniProgam {
   constructor(options) {
+    this.chunkNames = ['main']
+
     this.options = Object.assign(
       {
-        chuksName: '__assets_chunk_name__',
         extfile: true
       },
       options
@@ -53,114 +36,6 @@ class MiniPlugin {
     this.filesSet = new Set();
     this.pagesSet = new Set();
     this.componentSet = new Set();
-  }
-  apply(compiler) {
-    this.compiler = compiler;
-    this.outputPath = compiler.options.output.path;
-    this.compilerContext = join(compiler.context, 'src');
-    this.loadedEntrys = false;
-
-    this.getDistFilePath = null; // 在加载完入口文件后设置
-    this.getFiles = utils.getFiles;
-    this._appending = [];
-
-    this.compiler.hooks.environment.tap('MiniPlugin', this.setEnvHook.bind(this));
-    this.compiler.hooks.compilation.tap('MiniPlugin', this.setCompilation.bind(this));
-    this.compiler.hooks.emit.tapAsync('MiniPlugin', this.setEmitHook.bind(this));
-    this.compiler.hooks.additionalPass.tapAsync('MiniPlugin', this.setAdditionalPassHook.bind(this));
-
-    loader.$applyPluginInstance(this);
-    new MiniTemplate(this).apply(compiler);
-
-    this.loadEntrys(this.compiler.options.entry);
-
-    this.getDistFilePath = utils.getDistPath(this.compilerContext, this.entryContexts);
-  }
-
-  setEnvHook() {
-    let watch = this.compiler.watch;
-    this.compiler.watch = options => watch.call(this.compiler, this.compiler.options, this.watchCallBack.bind(this));
-  }
-
-  setAesstPathHook(path) {
-    return this.getDistFilePath(path);
-  }
-
-  /**
-   * compilation 事件处理
-   * @param {*} compilation
-   */
-  setCompilation(compilation) {
-    /**
-     * 标准输出文件名称
-     */
-    compilation.mainTemplate.hooks.assetPath.tap('MiniPlugin', this.setAesstPathHook.bind(this));
-
-    /**
-     * 去掉自动生成的入口
-     */
-    compilation.hooks.optimizeChunksBasic.tap('MiniPlugin', (chunks) => {
-      chunks.forEach(({
-        name
-      }, index) => {
-        if (name === this.options.chuksName || name === 'main') {
-          return chunks.splice(index, 1);
-        }
-      });
-    });
-
-    /**
-     * 动态添加入口文件
-     */
-    compilation.hooks.needAdditionalPass.tap('MiniPlugin', () => {
-      // 在新的编译开始时检查 app json
-      return this._appending.length > 0;
-    });
-  }
-
-  setAdditionalPassHook(callback) {
-    if (this._appending.length > 0) {
-      this.addEntrys(this.compilerContext, this._appending);
-    }
-    this._appending = [];
-    callback();
-  }
-
-  setEmitHook(compilation, callback) {
-    let ignoreEntrys = this.getIgnoreEntrys();
-    let assets = compilation.assets;
-
-    /**
-     * 合并 app.json
-     */
-    assets['app.json'] = this.getAppJson();
-
-    /**
-     * 直接替换 js 代码
-     */
-    assets['app.js'] = assets[this.mainName + '.js'];
-
-    /**
-     * 合并 .wxss 代码到 app.wxss
-     */
-    assets['app.wxss'] = this.getAppWxss(compilation);
-
-    /**
-     * 检查一些 js 文件路径
-     */
-    for (const file in assets) {
-      let tempFile = this.getDistFilePath(file);
-
-      if (tempFile !== file) {
-        assets[tempFile] = assets[file];
-        delete assets[file];
-      }
-
-      if (ignoreEntrys.indexOf(file) > -1 || /node_modules/.test(file)) {
-        delete assets[file];
-      }
-    }
-    callback();
   }
 
   getAppJson() {
@@ -181,6 +56,16 @@ class MiniPlugin {
     });
 
     return new ConcatSource(JSON.stringify(code, null, 2));
+  }
+
+  getExtJson() {
+    if (!existsSync(this.options.extfile)) {
+      console.warn(`${this.options.extfile} 文件找不到`)
+      return new ConcatSource(JSON.stringify({}, null, 2));
+    }
+
+    let ext = require(this.options.extfile)
+    return new ConcatSource(JSON.stringify(ext, null, 2));
   }
 
   setAppJson(config, resourcePath) {
@@ -244,14 +129,19 @@ class MiniPlugin {
     let entryNames = [...new Set(this.entryNames)];
 
     entryNames = entryNames.map((name) => {
-      if (name !== 'app') {
-        return ['.json', '.wxss', '.js'].map(ext => name + ext);
-      }
-      return [];
+      if (name === 'app') return []
+      return ['.json', '.wxss', '.js'].map(ext => name + ext);
     });
 
     entryNames = flattenDeep(entryNames);
-    entryNames.push(this.options.chuksName + '.js');
+
+    /**
+     * 静态资源的主文件
+     */
+    entryNames = entryNames.concat(
+      this.chunkNames.map(chunkName => chunkName + '.js')
+    );
+
     return entryNames;
   }
 
@@ -274,7 +164,12 @@ class MiniPlugin {
   addAssetsEntry(context, entrys) {
     this.addListenFiles(entrys);
 
-    new MultiEntryPlugin(context, entrys, this.options.chuksName).apply(this.compiler);
+    let chunkName = mainChunkNameTemplate + mainChunkNameIndex
+    this.chunkNames.push(chunkName)
+    new MultiEntryPlugin(context, entrys, chunkName).apply(this.compiler);
+
+    // 自动生成
+    mainChunkNameIndex++
   }
 
   addScriptEntry(context, entrys) {
@@ -343,15 +238,17 @@ class MiniPlugin {
       /**
        * 入口文件只打包对应的 wxss 文件
        */
-      let entryFiles = this.getFiles(itemContext, fileName, ['.wxss']);
+      let entryFiles = getFiles(itemContext, fileName, ['.wxss']);
       this.addEntrys(itemContext, entryFiles);
     }
 
     let tabBar = this.appJsonCode.tabBar;
+    let extfile = this.options.extfile
+
     let entrys = [
-      this.getFiles(this.mainContext, 'project.config', ['.json']), // project.config.json
-      this.options.extfile ? this.getFiles(this.mainContext, 'ext', ['.json']) : [], // ext.json
-      this.getFiles(this.mainContext, this.mainName, ['.js']), // 打包主入口对应的 js 文件
+      getFiles(this.mainContext, 'project.config', ['.json']), // project.config.json
+      extfile === true ? getFiles(this.mainContext, 'ext', ['.json']) : [], // ext.json 只有 extfile 为 true 的时候才加载主包的 ext.json
+      getFiles(this.mainContext, this.mainName, ['.js']), // 打包主入口对应的 js 文件
     ];
 
     // tabBar icons
@@ -376,7 +273,7 @@ class MiniPlugin {
   }
 
   getPageFiles(page) {
-    let files = this.getFiles(page);
+    let files = getFiles(page);
     if (files.length < 2) {
       console.log('⚠️ ', `页面 ${page} 目录必要文件不全`.yellow, '\n');
       return [];
@@ -388,10 +285,7 @@ class MiniPlugin {
     return files;
   }
 
-  getNewPages({
-    pages = [],
-    subPackages = []
-  }, context) {
+  getNewPages({ pages = [], subPackages = [] }, context) {
     const _newPages = [];
     const isNewPage = (page) => {
       if (!this.pagesSet.has(page)) {
@@ -400,10 +294,7 @@ class MiniPlugin {
       return false;
     };
 
-    subPackages.forEach(({
-      root,
-      pages
-    }) =>
+    subPackages.forEach(({ root, pages }) =>
       pages.map((page) => {
         page = join(context, root, page);
         isNewPage(page) && _newPages.push(page);
@@ -436,62 +327,10 @@ class MiniPlugin {
     return files;
   }
 
-
-  /**
-   * 输出
-   * @param {*} err
-   * @param {*} stat
-   */
-  watchCallBack(err, stat) {
-    let {
-      hash,
-      startTime,
-      endTime
-    } = stat;
-    const {
-      warnings = [], errors = []
-    } = stat.compilation;
-    const status = warnings.length ?
-      ('WARN: ' + warnings.length).yellow :
-      errors.length ?
-        ('ERROR: ' + errors.length).red :
-        'SUCCESS'.green;
-
-    let ot = [{
-      time: (new Date()).toLocaleTimeString().gray,
-      status,
-      watch: this.filesSet.size,
-      page: this.pagesSet.size,
-      component: this.componentSet.size,
-      duration: (endTime - startTime + 'ms').red,
-      hash
-    }];
-
-    if (warnings.length) {
-      console.log(warnings);
-    }
-
-    if (errors.length) {
-      errors.forEach((err) => {
-        let message = err.message.split(/\n\n|\n/);
-        let mainMessage = message[0] || '';
-        let lc = mainMessage.match(/\((\d+:\d+)\)/);
-        lc = lc ? lc[1] : '1:1';
-
-        console.log('Error in file', (err.module && err.module.id + ':' + lc).red);
-        console.log(mainMessage.gray);
-        message[1] && console.log(message[1].gray);
-        message[2] && console.log(message[2].gray);
-        console.log('');
-      });
-    }
-
-    console.table(ot);
-  }
-
-  /**
+    /**
    * loader 中传递需要添加为入口文件的 js 文件
-   * @param {*} param0
+   * @param {Array} assets 组件文件数组
+   * @param {Array} components 组件数组
    */
   addNewConponentFiles(assets, components) {
     components.forEach(component => !this.componentSet.has(component) && this.componentSet.add(component));
@@ -511,5 +350,3 @@ class MiniPlugin {
     this._appending = this._appending.concat(pageFiles);
   }
 }
-
-module.exports = MiniPlugin;
