@@ -61,9 +61,9 @@ class MiniPlugin extends MiniProgam {
     let run = this.compiler.run;
     // 设置子包的 cachegroup 
     this.options.commonSubPackages && this.setCacheGroup()
-    this.compiler.watch = options => watch.call(this.compiler, this.compiler.options, this.watchCallBack.bind(this));
+    this.compiler.watch = options => watch.call(this.compiler, this.compiler.options, this.messageOutPut.bind(this));
 
-    this.compiler.run = () => run.call(this.compiler, this.watchCallBack.bind(this))
+    this.compiler.run = () => run.call(this.compiler, this.messageOutPut.bind(this))
   }
 
   /**
@@ -92,17 +92,19 @@ class MiniPlugin extends MiniProgam {
     });
 
     compilation.hooks.optimizeChunks.tap('MiniPlugin', chunks => {
+      let ignoreEntrys = this.getIgnoreEntrys()
       for (const chunk of chunks) {
-        if (chunk.hasEntryModule()) {
+        if (chunk.hasEntryModule() && !ignoreEntrys.indexOf(chunk.name) !== 0) {
           // 记录模块之间依赖关系
-          for (const module of chunk.getModules()) if (!module.isEntryModule()) {
-            const resourcePath = module.resource
-            let relPath = this.getDistFilePath(resourcePath)
-            let chunkName = chunk.name + '.js'
-            utils.setMapValue(DEPS_MAP, relPath, chunkName)
-            
-            module._usedModules = DEPS_MAP[relPath]
-          }
+          for (const module of chunk.getModules()) 
+            if (!module.isEntryModule()) {
+              const resourcePath = module.resource
+              let relPath = this.getDistFilePath(resourcePath)
+              let chunkName = chunk.name + '.js'
+              utils.setMapValue(DEPS_MAP, relPath, chunkName)
+              
+              module._usedModules = DEPS_MAP[relPath]
+            }
         }
       }
     })
@@ -186,7 +188,7 @@ class MiniPlugin extends MiniProgam {
     
     for (const { root } of subPackages) {
       let name = root.replace('/', '')
-      
+
       cachegroups[`${name}Commons`] = {
         name: `${root}/commonchunks`,
         chunks: 'initial',
@@ -217,7 +219,8 @@ class MiniPlugin extends MiniProgam {
   setComponentDeps(components, resourcePath) {
     let pagePath = this.getDistFilePath(resourcePath).replace(/\.json$/, '')
 
-    for (const component of components) {
+    for (let component of components) {
+      component = this.getDistFilePath(component)
       utils.setMapValue(COMPONENT_DEPS_MAP, component, pagePath)
     }
   }
@@ -241,12 +244,17 @@ class MiniPlugin extends MiniProgam {
    * @param {*} err
    * @param {*} stat
    */
-  watchCallBack(err, stat) {
+  messageOutPut(err, stat) {
     const { hash, startTime, endTime } = stat;
     const {
       warnings = [],
       errors = []
     } = stat.compilation;
+    let subPackagePages = 0
+
+    for (const [root, pages] of this.subpackageMap) {
+      subPackagePages += pages.length
+    }
     
     let ot = [{
       time: (new Date()).toLocaleTimeString().gray,
@@ -254,6 +262,7 @@ class MiniPlugin extends MiniProgam {
       watch: this.filesSet.size,
       page: this.pagesSet.size,
       component: this.componentSet.size,
+      subpackage: this.subpackageMap.size + '/' + subPackagePages,
       duration: ((endTime - startTime) / 1000 + 's').green,
       hash
     }];
@@ -268,23 +277,83 @@ class MiniPlugin extends MiniProgam {
       this.consoleMsg(errors)
     }
 
-    console.log('')
-    console.table(ot);
-
     if (this.options.analyze) {
       let analyzeMap = {
         fileUsed: {},
-        componentUsed: {}
+        componentUsed: {},
+        onlySubPackageUsed: {}
       }
-      for (const key in DEPS_MAP) {
-        analyzeMap.fileUsed[key] = Array.from(DEPS_MAP[key])
+      let fileWarnings = []
+      let componentWarnings = []
+      let compare = (a, b) => {
+        if (a.length <= b.length) {
+          return -1
+        }
+
+        return 1
       }
 
-      for (const key of COMPONENT_DEPS_MAP) {
-        analyzeMap.componentUsed[key] = Array.from(DEPS_MAP[key])
+      let commonWarnings = []
+      for (const key in ONLY_SUBPACKAGE_USED_MODULE_MAP) {
+        const commons = analyzeMap.onlySubPackageUsed[key] = Array.from(ONLY_SUBPACKAGE_USED_MODULE_MAP[key])
+
+        let otherPackageFiles = this.otherPackageFiles(key, commons)
+        if (otherPackageFiles.length) {
+          commonWarnings.push(`子包 ${key.blue} 单独使用了 ${(otherPackageFiles.length + '').red} 个其他非子包内的文件`)
+        }
       }
-      fs.writeFileSync(join(this.compiler.context, 'analyze.json'), JSON.stringify(DEPS_MAP, null, 2), 'utf-8')
+      commonWarnings = commonWarnings.sort(compare)
+      
+      for (const key in DEPS_MAP) {
+        const files = analyzeMap.fileUsed[key] = Array.from(DEPS_MAP[key])
+
+        if (files.length >= 20) {
+          fileWarnings.push(`文件 ${ key.blue } 被引用 ${ (files.length + '').red } 次`)
+        }
+      }
+
+      fileWarnings = fileWarnings.sort(compare)
+
+      for (const key in COMPONENT_DEPS_MAP) {
+        const components = analyzeMap.componentUsed[key] = Array.from(COMPONENT_DEPS_MAP[key])
+        const packageRoot = this.pathsInSamePackage(components)
+
+        // 组件只在子包或者某个目录下的文件中使用，提示
+        if (packageRoot) { // 使用组件的文件在同一个子包内
+          let isInPackage = this.pathsInSamePackage([key, components[0]])
+          !isInPackage && componentWarnings.push(`自定义组件 ${key.blue} 建议移动到子包 ${ packageRoot.red } 内`)
+        } else if (components.length === 1 && !this.pathsInSameFolder([key, ...components])) {
+          // 只有一个页面（组件）使用了该自定义组件
+          componentWarnings.push(`自定义组件 ${key.blue} 建议移动到 ${ dirname(components[0]).red } 目录内`)
+        }
+      }
+
+      componentWarnings = componentWarnings.sort(compare)
+
+      fileWarnings.forEach(message => console.log('提示'.yellow, message))
+
+      console.log('')
+
+      componentWarnings.forEach(message => console.log('提示'.yellow, message))
+
+      console.log('')
+      commonWarnings.length > 0 && console.log('建议检查以下子包，并移动独用文件到子包内'.red)
+      commonWarnings.forEach(message => console.log('提示'.yellow, message))
+      
+      if (fileWarnings.length || commonWarnings.length || componentWarnings.length) {
+        console.log('')
+        console.log(`你可以在 ${join(this.compiler.context, 'analyze.json')} 中查看详细信息`.yellow)
+        console.log('')
+        console.log('  fileUsed'.green, '——'.gray, '文件被依赖关系。键为被依赖文件，值为依赖该文件的文件列表')
+        console.log('  componentUsed'.green, '——'.gray, '自定义组件被依赖关系。键为被依赖的组件名，值为依赖该组件的组件(页面)列表')
+        console.log('  onlySubPackageUsed'.green, '——'.gray, '子包单独使用的文件列表。键为子包名，值为该子包单独依赖的文件列表')
+        console.log('')
+      }
+      fs.writeFileSync(join(this.compiler.context, 'analyze.json'), JSON.stringify(analyzeMap, null, 2), 'utf-8')
     }
+
+    console.log('')
+    console.table(ot);
   }
 
   consoleMsg (messages) {

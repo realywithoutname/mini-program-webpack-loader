@@ -38,6 +38,7 @@ module.exports = class MiniProgam {
     this.filesSet = new Set();
     this.pagesSet = new Set();
     this.componentSet = new Set();
+    this.subpackageMap = new Map()
   }
 
   getAppJson() {
@@ -300,11 +301,17 @@ module.exports = class MiniProgam {
       return false;
     };
 
-    subPackages.forEach(({ root, pages }) =>
+    subPackages.forEach(({ root, pages }) => {
+      let _pages = []
+
       pages.map((page) => {
+        _pages.push(join(root, page))
         page = join(context, root, page);
         isNewPage(page) && _newPages.push(page);
-      }));
+      });
+
+      this.subpackageMap.set(root, _pages)
+    })
 
     pages.forEach((page) => {
       page = join(context, page);
@@ -331,6 +338,89 @@ module.exports = class MiniProgam {
     }
 
     return files;
+  }
+
+  /**
+   * 判断所给的路径在不在自定义组件内
+   * @param {String} path 任意路径
+   */
+  pathInSubpackage (path) {
+    let { subPackages } = this.getAppJson()
+
+    for (const { root } of subPackages) {
+      let match = path.match(root)
+
+      if (match !== null && match.index === 0) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  /**
+   * 判断所给的路径集合是不是在同一个包内
+   * @param {Array} paths 路径列表
+   */
+  pathsInSamePackage (paths) {
+    // 取第一个路径，获取子包 root，然后和其他路径对比
+    let firstPath = paths[0]
+    let root = this.getPathRoot(firstPath)
+    
+    // 路径不在子包内
+    if (!root) {
+      return ''
+    }
+    
+    let reg = new RegExp(`^${root}`)
+    for (const path of paths) {
+      if (!reg.test(path)) return ''
+    }
+
+    return root
+  }
+
+  /**
+   * 判断列表内数据是不是在同一个目录下
+   * @param {*} paths 
+   */
+  pathsInSameFolder(paths) {
+    let firstPath = paths[0]
+    let folder = firstPath.split('/')[0]
+    let reg = new RegExp(`^${folder}`)
+
+    for (const path of paths) {
+      if (!reg.test(path)) return ''
+    }
+
+    return folder
+  }
+
+  /**
+   * 获取路径所在的 package root
+   * @param {String} path 
+   */
+  getPathRoot (path) {
+    let { subPackages } = this.getAppJson()
+
+    for (const { root } of subPackages) {
+      let match = path.match(root)
+
+      if (match !== null && match.index === 0) {
+        return root
+      }
+    }
+
+    return ''
+  }
+
+  /**
+   * 
+   * @param {*} root 
+   * @param {*} files 
+   */
+  otherPackageFiles (root, files) {
+    return files.filter(file => file.indexOf(root) === -1)
   }
 
   /**
