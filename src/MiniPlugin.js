@@ -1,5 +1,6 @@
 require('console.table');
 const colors = require('colors');
+const fs = require('fs')
 const {
   dirname,
   join,
@@ -13,6 +14,7 @@ const loader = require('./loader');
 const utils = require('./utils');
 const MiniTemplate = require('./MiniTemplate');
 const MiniProgam = require('./MiniProgram')
+const DEPS_MAP = {}
 
 class MiniPlugin extends MiniProgam {
   constructor (options) {
@@ -26,22 +28,22 @@ class MiniPlugin extends MiniProgam {
 
     this._appending = [];
 
-    this.compiler.hooks.environment.tap('MiniPlugin', this.setEnvHook.bind(this));
-    this.compiler.hooks.compilation.tap('MiniPlugin', this.setCompilation.bind(this));
-    this.compiler.hooks.emit.tapAsync('MiniPlugin', this.setEmitHook.bind(this));
-    this.compiler.hooks.additionalPass.tapAsync('MiniPlugin', this.setAdditionalPassHook.bind(this));
-
     // 向 loader 中传递插件实例
     loader.$applyPluginInstance(this);
 
     // 使用模板插件，用于设置输出格式
     new MiniTemplate(this).apply(compiler);
 
-    // 加载入口文件
+    // 加载入口文件，必须在 environment 前完成
     this.loadEntrys(this.compiler.options.entry);
 
     // 获取打包后路径（在 loader 中有使用）
     this.getDistFilePath = utils.getDistPath(this.compilerContext, this.entryContexts);
+
+    this.compiler.hooks.environment.tap('MiniPlugin', this.setEnvHook.bind(this));
+    this.compiler.hooks.compilation.tap('MiniPlugin', this.setCompilation.bind(this));
+    this.compiler.hooks.emit.tapAsync('MiniPlugin', this.setEmitHook.bind(this));
+    this.compiler.hooks.additionalPass.tapAsync('MiniPlugin', this.setAdditionalPassHook.bind(this));
   }
 
   /**
@@ -49,6 +51,9 @@ class MiniPlugin extends MiniProgam {
    */
   setEnvHook() {
     let watch = this.compiler.watch;
+
+    // 设置子包的 cachegroup 
+    this.setCacheGroup()
     this.compiler.watch = options => watch.call(this.compiler, this.compiler.options, this.watchCallBack.bind(this));
   }
 
@@ -76,6 +81,26 @@ class MiniPlugin extends MiniProgam {
     compilation.hooks.needAdditionalPass.tap('MiniPlugin', () => {
       return this._appending.length > 0;
     });
+
+    compilation.hooks.optimizeChunks.tap('MiniPlugin', chunks => {
+      for (const chunk of chunks) {
+        if (chunk.hasEntryModule()) {
+          // 记录模块之间依赖关系
+          for (const module of chunk.getModules()) if (!module.isEntryModule()) {
+            const resourcePath = module.resource
+            let relPath = relative(this.compiler.context, resourcePath)
+            let chunkName = chunk.name + '.js'
+            if (!DEPS_MAP[relPath]) {
+              DEPS_MAP[relPath] = new Set()
+              DEPS_MAP[relPath].add(chunkName)
+            } else {
+              DEPS_MAP[relPath].add(chunkName)
+            }
+            module._usedModules = DEPS_MAP[relPath]
+          }
+        }
+      }
+    })
   }
 
   /**
@@ -97,7 +122,7 @@ class MiniPlugin extends MiniProgam {
     /**
      * 合并 app.json
      */
-    assets['app.json'] = this.getAppJson();
+    assets['app.json'] = this.getAppJsonCode();
 
     console.assert(assets['app.json'], 'app.json 不应该为空')
     /**
@@ -137,6 +162,33 @@ class MiniPlugin extends MiniProgam {
     callback();
   }
 
+  setCacheGroup() {
+    let { subPackages } = this.getAppJson()
+    let cachegroups = this.compiler.options.optimization.splitChunks.cacheGroups
+
+    function fn (module, packageRoot) {
+      if (!/\.js$/.test(module.resource) || module.isEntryModule()) return
+    
+      let reg = new RegExp(packageRoot)
+      const notOnlyInThisPackage = module._usedModules && 
+        Array.from(module._usedModules).some(moduleName => !reg.test(moduleName))
+      // 如果改模块在别的包也有使用，则不应该打包到该包
+      return !notOnlyInThisPackage;
+    }
+    
+    for (const { root } of subPackages) {
+      let name = root.replace('/', '')
+      
+      cachegroups[`${name}Commons`] = {
+        name: `${root}/commonchunks`,
+        chunks: 'initial',
+        minSize: 0,
+        minChunks: 1,
+        test: module => fn(module, root),
+        priority: 3
+      }
+    }
+  }
   /**
    * 输出
    * @param {*} err
@@ -170,6 +222,13 @@ class MiniPlugin extends MiniProgam {
     }
 
     console.table(ot);
+
+    if (this.options.analyze) {
+      for (const key in DEPS_MAP) {
+        DEPS_MAP[key] = Array.from(DEPS_MAP[key])
+      }
+      fs.writeFileSync(join(this.compiler.context, 'analyze.json'), JSON.stringify(DEPS_MAP, null, 2), 'utf-8')
+    }
   }
 
   consoleMsg (messages) {

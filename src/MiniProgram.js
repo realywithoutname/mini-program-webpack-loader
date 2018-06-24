@@ -55,7 +55,11 @@ module.exports = class MiniProgam {
       if (!code.key) delete code.key;
     });
 
-    return new ConcatSource(JSON.stringify(code, null, 2));
+    return code;
+  }
+
+  getAppJsonCode () {
+    return new ConcatSource(JSON.stringify(this.getAppJson(), null, 2))
   }
 
   getExtJson() {
