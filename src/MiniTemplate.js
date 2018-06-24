@@ -36,24 +36,29 @@ module.exports = class MiniTemplate {
   setLocalVars(source, chunk, hash) {
     try {
       let groups = chunk.groupsIterable
-      let depChunks = ''
+      let modules = new Set()
+
       if (chunk.hasEntryModule()) {
         // 当前 chunk 最后被打包的位置
         let file = this.$plugin.getDistFilePath(`${chunk.name}.js`)
         let dir = dirname(file)
 
         for (const chunkGroup of groups) {
-          for (const {
-              name
-            } of chunkGroup.chunks) {
+          for (const { name } of chunkGroup.chunks) {
             if (name !== chunk.name) {
               // 依赖 chunk 最后被打包的位置
-              let depFile = this.$plugin.getDistFilePath(`${name}.js`)
-              depChunks += `modules = Object.assign(require('${ relative(dir, depFile) }').modules, modules);\n`
+              let depFile = this.$plugin.getDistFilePath(`${name}.js`);
+              modules.add(relative(dir, depFile))
             }
           }
         }
       }
+      
+      let depChunks = ''
+      for (const item of modules) {
+        depChunks += `modules = Object.assign(require('${ item }').modules, modules);\n`
+      }
+
       return Template.asString([
         '// 使用缓存中加载过的模块作为默认加载过的模块，否则公共模块会被调用多次',
         'var installedModules = wx.__installedModules = wx.__installedModules || {}',
