@@ -84,3 +84,13 @@ exports.flattenDeep = (arr) => {
   }
   return arr;
 };
+
+exports.setMapValue = (origin, protertyName, value) => {
+  let proterty = origin[protertyName]
+  if (!proterty) {
+    let proterty = origin[protertyName] = new Set()
+    proterty.add(value)
+  } else {
+    proterty.add(value)
+  }
+}

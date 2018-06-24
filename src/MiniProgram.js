@@ -22,7 +22,9 @@ module.exports = class MiniProgam {
 
     this.options = Object.assign(
       {
-        extfile: true
+        extfile: true,
+        commonSubPackages: true,
+        analyze: false
       },
       options
     );
@@ -329,16 +331,6 @@ module.exports = class MiniProgam {
     }
 
     return files;
-  }
-
-    /**
-   * loader 中传递需要添加为入口文件的 js 文件
-   * @param {Array} assets 组件文件数组
-   * @param {Array} components 组件数组
-   */
-  addNewConponentFiles(assets, components) {
-    components.forEach(component => !this.componentSet.has(component) && this.componentSet.add(component));
-    this._appending = this._appending.concat(assets.filter(file => !this.filesSet.has(file)));
   }
 
   /**

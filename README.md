@@ -17,9 +17,16 @@
 - MiniPlugin
   - 参数
     - extfile
-      - `true` 打包主包下的 ext.json
+      - `true` 打包主包下的 ext.json(默认值)
       - `false` 不打包 ext.json
       - `string` extfile 文件路径
+  
+    - commonSubPackages
+      - Boolean 自动把 subpackages 中子包独自使用的 js 文件打包到子包内。默认值为 `true`
+
+    - analyze
+      - Boolean 输出模块分析
+      
 
 插件主要做了以下几件事情：
 - 小程序项目的 Page 文件加载

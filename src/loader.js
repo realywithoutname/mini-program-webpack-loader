@@ -104,7 +104,7 @@ class MiniLoader {
       
       // 新增到编译的组件以及组件对应的文件
       assets = assets.concat(utils.getFiles(dir, name))
-      components.push(dir)
+      components.push(path.join(dir, name))
       // 获取相对路径，返回到 json 文件中
       let relPath = this.getRelativePath(absPath)
       return relPath.substr(0, relPath.length - 5)
@@ -132,7 +132,8 @@ class MiniLoader {
     /**
      * 通知插件，下次编译的时候要把这些文件加到编译中
      */
-    this.$plugin.addNewConponentFiles(assets, components)
+    this.$plugin.addNewConponentFiles(assets, components, this.resourcePath)
+    
     return JSON.stringify(json, null, 2)
   }
 
