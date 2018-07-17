@@ -2,6 +2,7 @@ const MiniPlugin = require('./MiniPlugin')
 const { getFiles, flattenDeep, getDistPath } = require('./utils')
 const { isAbsolute, join, dirname, basename } = require('path')
 const loader = require('./loader');
+const MiniTemplate = require('./MiniTemplate');
 
 class TransformPlugin extends MiniPlugin {
   constructor () {
@@ -21,7 +22,9 @@ class TransformPlugin extends MiniPlugin {
     this.compiler = compiler
     this.compilerContext = join(compiler.context, 'src');
     
-    let componentFiles = this.loadComponents(components)
+    let componentFiles = this.loadComponents(components);
+    
+    new MiniTemplate(this).apply(compiler);
 
     this.addEntrys(this.entryDir, componentFiles)
     loader.$applyPluginInstance(this);

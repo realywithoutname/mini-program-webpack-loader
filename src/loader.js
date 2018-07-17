@@ -115,7 +115,11 @@ class MiniLoader {
      * 自定义组件
      */
     for (const key in usingComponents || {}) {
-      usingComponents[key] = await setConponentFiles.call(this, usingComponents[key])
+      let component = usingComponents[key]
+      if (/^plugin:\/\//.test(component)) {
+        continue
+      }
+      usingComponents[key] = await setConponentFiles.call(this, component)
     }
 
     /**
