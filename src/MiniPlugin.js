@@ -358,6 +358,10 @@ class MiniPlugin extends MiniProgam {
 
   consoleMsg (messages) {
     messages.forEach((err) => {
+      if (!err.module || !err.module.id) {
+        return console.log(err)
+      }
+
       let message = err.message.split(/\n\n|\n/);
       let mainMessage = message[0] || '';
       let lc = mainMessage.match(/\((\d+:\d+)\)/);
