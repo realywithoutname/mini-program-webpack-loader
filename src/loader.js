@@ -194,7 +194,7 @@ class MiniLoader {
     let originPath = this.resolveDistPath(this.resourcePath)
     let depPath = this.resolveDistPath(dep)
 
-    return path.relative(path.dirname(originPath), depPath)
+    return './' + path.relative(path.dirname(originPath), depPath)
   }
 
   async getAbsolutePath(context, dep) {
