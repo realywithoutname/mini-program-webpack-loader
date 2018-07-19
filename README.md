@@ -26,6 +26,11 @@
 
     - analyze
       - Boolean 输出模块分析
+
+    - resources
+      - Array 提供资源的目录。除了所有入口所在的目录，src目录，node_modules，其他目录需要在这里添加否则可能导致路径计算错误。  
+      如 `path/to/src/app.js`(app.js 与 app.json 同级) 依赖了一个 `path/to/common/base.js` 如果希望 `base.js` 被打包到与 `app.js` 同级的目录，  
+      则必须设置 `resources: ['path/to/common']`。主要为了解决多个项目依赖一个非 node_modules 的公用自定义组件。
       
 
 插件主要做了以下几件事情：

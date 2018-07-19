@@ -24,7 +24,8 @@ module.exports = class MiniProgam {
       {
         extfile: true,
         commonSubPackages: true,
-        analyze: false
+        analyze: false,
+        resources: []
       },
       options
     );

@@ -43,8 +43,16 @@ class MiniPlugin extends MiniProgam {
     // 加载入口文件，必须在 environment 前完成
     this.loadEntrys(this.compiler.options.entry);
 
+    let resourcePaths = new Set(
+      this.entryContexts.concat(
+        this.options.resources
+      )
+    )
+
+    resourcePaths.add(this.compilerContext)
+
     // 获取打包后路径（在 loader 中有使用）
-    this.getDistFilePath = utils.getDistPath(this.compilerContext, this.entryContexts);
+    this.getDistFilePath = utils.getDistPath(this.compilerContext, Array.from(resourcePaths), this.outputPath);
     
     // hooks
     this.compiler.hooks.environment.tap('MiniPlugin', this.setEnvHook.bind(this));
