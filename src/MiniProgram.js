@@ -341,6 +341,27 @@ module.exports = class MiniProgam {
     return files;
   }
 
+  moduleOnlyUsedBySubpackages (module) {
+    if (!module._usedModules) throw new Error('非插件提供的 module，不能调用这个方法')
+
+    let { subPackages } = this.getAppJson()
+    let subRoots = subPackages.map(({root}) => root) || []
+    let subReg = new RegExp(subRoots.join('|'))
+    let usedFiles = Array.from(module._usedModules)
+
+    return !usedFiles.some(moduleName => !subReg.test(moduleName))
+  }
+
+  moduleUsedBySubpackage (module, root) {
+    if (!module._usedModules) throw new Error('非插件提供的 module，不能调用这个方法')
+
+    let reg = new RegExp(root)
+
+    let usedFiles = Array.from(module._usedModules)
+
+    return usedFiles.some(moduleName => reg.test(moduleName))
+  }
+
   /**
    * 判断所给的路径在不在自定义组件内
    * @param {String} path 任意路径

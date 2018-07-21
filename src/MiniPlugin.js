@@ -197,14 +197,16 @@ class MiniPlugin extends MiniProgam {
     for (const { root } of subPackages) {
       let name = root.replace('/', '')
 
-      cachegroups[`${name}Commons`] = {
-        name: `${root}/commonchunks`,
-        chunks: 'initial',
-        minSize: 0,
-        minChunks: 1,
-        test: module => fn(module, root),
-        priority: 3
-      }
+      cachegroups[`${name}Commons`] = this.options.setSubPackageCacheGroup 
+        ? this.options.setSubPackageCacheGroup(this, root) 
+        : {
+          name: `${root}/commonchunks`,
+          chunks: 'initial',
+          minSize: 0,
+          minChunks: 1,
+          test: module => fn(module, root),
+          priority: 3
+        }
     }
   }
 
