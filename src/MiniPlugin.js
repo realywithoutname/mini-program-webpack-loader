@@ -294,9 +294,6 @@ class MiniPlugin extends MiniProgam {
       size += assets[key].size()
     }
 
-    console.log(size);
-    
-    
     let ot = [{
       time: (new Date()).toLocaleTimeString().gray,
       status: !errors.length ? 'success'.green : 'fail'.red,
