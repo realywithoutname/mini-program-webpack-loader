@@ -11,7 +11,11 @@ const { ConcatSource, RawSource } = require('webpack-sources');
 const MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin');
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
 
-const { flattenDeep, getFiles } = require('./utils')
+const {
+  flattenDeep,
+  getFiles,
+  componentFiles
+} = require('./utils')
 
 const mainChunkNameTemplate = '__assets_chunk_name__'
 let mainChunkNameIndex = 0
@@ -201,13 +205,15 @@ module.exports = class MiniProgam {
     });
   }
 
-  loadEntrys(entry) {
+  async loadEntrys(entry) {
     this.entrys = entry = typeof entry === typeof '' ? [entry] : entry;
     this.checkEntry(entry);
     let index = 0;
 
     this.entryContexts = [];
     this.entryNames = [];
+
+    let promiseSet = new Set()
 
     for (const item of entry) {
       const entryPath = isAbsolute(item) ? item : join(context, item);
@@ -240,6 +246,16 @@ module.exports = class MiniProgam {
        * 添加页面
        */
       let pageFiles = this.getPagesEntry(config, itemContext);
+      
+      let componentSet = new Set()
+
+      promiseSet.add(
+        this.loadComponentsFiles(pageFiles, componentSet)
+          .then(() => {
+            let files = flattenDeep(Array.from(componentSet))
+            this.addEntrys(itemContext, files)
+          })
+      )
 
       this.addEntrys(itemContext, pageFiles);
 
@@ -263,8 +279,19 @@ module.exports = class MiniProgam {
     entrys.concat(tabBar && tabBar.list && this.getTabBarIcons(this.mainContext, tabBar.list) || []);
 
     this.addEntrys(this.mainContext, flattenDeep(entrys));
+    return await Promise.all(Array.from(promiseSet))
   }
 
+  async loadComponentsFiles(pageFiles, componentSet) {
+    let jsons = pageFiles.filter((file) => /\.json/.test(file))
+
+    for (const json of jsons) {
+      let files = await componentFiles(this.resolver, json)
+      files = flattenDeep(files)
+      componentSet.add(files)
+      await this.loadComponentsFiles(flattenDeep(files), componentSet)
+    }
+  }
   /**
    * 根据 app.json 配置获取页面文件路径
    * @param {*} entry
@@ -339,6 +366,41 @@ module.exports = class MiniProgam {
     }
 
     return files;
+  }
+
+  moduleOnlyUsedBySubpackages (module) {
+    if (!/\.js$/.test(module.resource) || module.isEntryModule()) return false
+    if (!module._usedModules) throw new Error('非插件提供的 module，不能调用这个方法')
+
+    let { subPackages } = this.getAppJson()
+    let subRoots = subPackages.map(({root}) => root) || []
+    let subReg = new RegExp(subRoots.join('|'))
+    let usedFiles = Array.from(module._usedModules)
+
+    return !usedFiles.some(moduleName => !subReg.test(moduleName))
+  }
+
+  moduleUsedBySubpackage (module, root) {
+    if (!/\.js$/.test(module.resource) || module.isEntryModule()) return false
+    if (!module._usedModules) throw new Error('非插件提供的 module，不能调用这个方法')
+
+    let reg = new RegExp(root)
+
+    let usedFiles = Array.from(module._usedModules)
+
+    return usedFiles.some(moduleName => reg.test(moduleName))
+  }
+
+  moduleOnlyUsedBySubPackage (module, root) {
+    if (!/\.js$/.test(module.resource) || module.isEntryModule()) return false
+
+    let usedFiles = module._usedModules
+
+    if (!usedFiles) return false
+      
+    let reg = new RegExp(root)
+
+    return !Array.from(usedFiles).some(moduleName => !reg.test(moduleName))
   }
 
   /**

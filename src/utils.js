@@ -1,6 +1,8 @@
 const {
   join,
-  isAbsolute
+  isAbsolute,
+  dirname,
+  basename
 } = require('path')
 
 const {
@@ -8,6 +10,65 @@ const {
 } = require('fs');
 
 const EXTS = ['.js', '.json', '.wxml', '.wxss', '.wxs', '.scss', '.pcss']
+
+async function setConponentFiles(resolver, context, component) {
+  component = component + '.json'
+
+  // 获取自定义组件的绝对路径
+  let absPath = await resolver(context, component)
+
+  // 获取依赖的实际文件列表
+  let dir = dirname(absPath)
+  let name = basename(absPath, '.json')
+
+  // 新增到编译的组件以及组件对应的文件
+  return exports.getFiles(dir, name)
+}
+
+exports.componentFiles = async (resolver, jsonFile) => {
+  let componentJOSN = require(jsonFile)
+  let context = dirname(jsonFile)
+  let {
+    componentGenerics,
+    usingComponents
+  } = componentJOSN
+
+  if (!usingComponents && !componentGenerics) return []
+
+  let filePromise = []
+  /**
+   * 自定义组件
+   */
+  for (const key in usingComponents || {}) {
+    let component = usingComponents[key]
+    if (/^plugin:\/\//.test(component)) {
+      continue
+    }
+    filePromise.push(
+      setConponentFiles(resolver, context, component)
+    )
+  }
+
+  /**
+   * 抽象组件
+   */
+  for (const key in componentGenerics) {
+    if (typeof componentGenerics[key] === 'object') {
+      for (const _key in componentGenerics[key]) {
+        let element = componentGenerics[key][_key];
+        filePromise.push(
+          setConponentFiles(resolver, context, element)
+        )
+      }
+    }
+  }
+
+  return await Promise.all(filePromise)
+}
+
+exports.getAbsolutePath = async (resolver, context, path) => {
+  return await resolver()
+}
 
 exports.getDistPath = (compilerContext, entryContexts, outPath) => {
   /**

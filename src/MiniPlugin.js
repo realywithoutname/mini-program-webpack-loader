@@ -15,6 +15,12 @@ const loader = require('./loader');
 const utils = require('./utils');
 const MiniTemplate = require('./MiniTemplate');
 const MiniProgam = require('./MiniProgram')
+const {
+  NodeJsInputFileSystem,
+  CachedInputFileSystem,
+  ResolverFactory
+} = require('enhanced-resolve');
+
 const stdout = process.stdout
 
 const DEPS_MAP = {}
@@ -40,35 +46,59 @@ class MiniPlugin extends MiniProgam {
     new MiniTemplate(this).apply(compiler);
     new ProgressPlugin({ handler: this.progress }).apply(compiler)
 
-    // 加载入口文件，必须在 environment 前完成
-    this.loadEntrys(this.compiler.options.entry);
-
-    let resourcePaths = new Set(
-      this.entryContexts.concat(
-        this.options.resources
+    const resolver = ResolverFactory.createResolver(
+      Object.assign(
+        {
+          fileSystem: new CachedInputFileSystem(new NodeJsInputFileSystem(), 4000),
+          extensions: ['.js', '.json'],
+        }, 
+        this.compiler.options.resolve
       )
-    )
+    );
 
-    resourcePaths.add(this.compilerContext)
+    this.resolver = (context, request) => {
+      return new Promise((resolve, reject) => {
+        resolver.resolve({}, context, request, {}, (err, res) => err ? reject(err) : resolve(res))
+      })
+    }
+    // 加载入口文件，必须在 environment 前完成
+    // this.loadEntrys(this.compiler.options.entry);
 
     // 获取打包后路径（在 loader 中有使用）
-    this.getDistFilePath = utils.getDistPath(this.compilerContext, Array.from(resourcePaths), this.outputPath);
+    this.getDistFilePath = () => {};
     
     // hooks
     this.compiler.hooks.environment.tap('MiniPlugin', this.setEnvHook.bind(this));
+    this.compiler.hooks.beforeCompile.tapAsync('MiniPlugin', this.beforeCompile.bind(this))
     this.compiler.hooks.compilation.tap('MiniPlugin', this.setCompilation.bind(this));
     this.compiler.hooks.emit.tapAsync('MiniPlugin', this.setEmitHook.bind(this));
     this.compiler.hooks.additionalPass.tapAsync('MiniPlugin', this.setAdditionalPassHook.bind(this));
   }
 
+  beforeCompile(params, callback) {
+    this.loadEntrys(this.compiler.options.entry)
+      .then(() => {
+        let resourcePaths = new Set(
+          this.entryContexts.concat(
+            this.options.resources
+          )
+        )
+        
+        resourcePaths.add(this.compilerContext)
+        // 设置子包的 cachegroup 
+        this.options.commonSubPackages && this.setCacheGroup()
+        this.getDistFilePath = utils.getDistPath(this.compilerContext, Array.from(resourcePaths), this.outputPath)
+
+        callback()
+      })
+  }
   /**
    * 重写 webpack.watch
    */
   setEnvHook() {
     let watch = this.compiler.watch;
     let run = this.compiler.run;
-    // 设置子包的 cachegroup 
-    this.options.commonSubPackages && this.setCacheGroup()
+    
     this.compiler.watch = options => watch.call(this.compiler, this.compiler.options, this.messageOutPut.bind(this));
 
     this.compiler.run = () => run.call(this.compiler, this.messageOutPut.bind(this))
@@ -178,23 +208,16 @@ class MiniPlugin extends MiniProgam {
   }
 
   setCacheGroup() {
-    let { subPackages } = this.getAppJson()
+    let appJson = this.getAppJson()
     let cachegroups = this.compiler.options.optimization.splitChunks.cacheGroups
 
-    function fn (module, packageRoot) {
-      if (!/\.js$/.test(module.resource) || module.isEntryModule()) return
-    
-      let reg = new RegExp(packageRoot)
-      const notOnlyInThisPackage = module._usedModules && 
-        Array.from(module._usedModules).some(moduleName => !reg.test(moduleName))
-      // 如果改模块在别的包也有使用，则不应该打包到该包
-      if (!notOnlyInThisPackage) {
-        utils.setMapValue(ONLY_SUBPACKAGE_USED_MODULE_MAP, packageRoot, module.resource)
-      }
-      return !notOnlyInThisPackage;
+    if (this.options.setSubPackageCacheGroup) {
+      let groups = this.options.setSubPackageCacheGroup(this, appJson)
+      Object.assign(cachegroups, groups)
+      return 
     }
     
-    for (const { root } of subPackages) {
+    for (const { root } of appJson.subPackages) {
       let name = root.replace('/', '')
 
       cachegroups[`${name}Commons`] = {
@@ -202,7 +225,7 @@ class MiniPlugin extends MiniProgam {
         chunks: 'initial',
         minSize: 0,
         minChunks: 1,
-        test: module => fn(module, root),
+        test: module => this.moduleOnlyUsedBySubPackage(module, root),
         priority: 3
       }
     }
@@ -226,7 +249,7 @@ class MiniPlugin extends MiniProgam {
    */
   setComponentDeps(components, resourcePath) {
     let pagePath = this.getDistFilePath(resourcePath).replace(/\.json$/, '')
-
+    
     for (let component of components) {
       component = this.getDistFilePath(component)
       utils.setMapValue(COMPONENT_DEPS_MAP, component, pagePath)
@@ -256,13 +279,23 @@ class MiniPlugin extends MiniProgam {
     const { hash, startTime, endTime } = stat;
     const {
       warnings = [],
-      errors = []
+      errors = [],
+      assets
     } = stat.compilation;
     let subPackagePages = 0
 
     for (const [root, pages] of this.subpackageMap) {
       subPackagePages += pages.length
     }
+
+    let size = 0
+
+    for (const key in assets) {
+      size += assets[key].size()
+    }
+
+    console.log(size);
+    
     
     let ot = [{
       time: (new Date()).toLocaleTimeString().gray,
@@ -272,6 +305,7 @@ class MiniPlugin extends MiniProgam {
       component: this.componentSet.size,
       subpackage: this.subpackageMap.size + '/' + subPackagePages,
       duration: ((endTime - startTime) / 1000 + 's').green,
+      size: ((size / 1024).toFixed(2) + ' m').green,
       hash
     }];
 
