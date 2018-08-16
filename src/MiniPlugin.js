@@ -1,6 +1,7 @@
 require('console.table');
 const colors = require('colors');
-const fs = require('fs')
+const fs = require('fs');
+const readline = require('readline');
 const {
   dirname,
   join,
@@ -51,7 +52,7 @@ class MiniPlugin extends MiniProgam {
         {
           fileSystem: new CachedInputFileSystem(new NodeJsInputFileSystem(), 4000),
           extensions: ['.js', '.json'],
-        }, 
+        },
         this.compiler.options.resolve
       )
     );
@@ -66,7 +67,7 @@ class MiniPlugin extends MiniProgam {
 
     // 获取打包后路径（在 loader 中有使用）
     this.getDistFilePath = () => {};
-    
+
     // hooks
     this.compiler.hooks.environment.tap('MiniPlugin', this.setEnvHook.bind(this));
     this.compiler.hooks.beforeCompile.tapAsync('MiniPlugin', this.beforeCompile.bind(this))
@@ -83,9 +84,9 @@ class MiniPlugin extends MiniProgam {
             this.options.resources
           )
         )
-        
+
         resourcePaths.add(this.compilerContext)
-        // 设置子包的 cachegroup 
+        // 设置子包的 cachegroup
         this.options.commonSubPackages && this.setCacheGroup()
         this.getDistFilePath = utils.getDistPath(this.compilerContext, Array.from(resourcePaths), this.outputPath)
 
@@ -98,7 +99,7 @@ class MiniPlugin extends MiniProgam {
   setEnvHook() {
     let watch = this.compiler.watch;
     let run = this.compiler.run;
-    
+
     this.compiler.watch = options => watch.call(this.compiler, this.compiler.options, this.messageOutPut.bind(this));
 
     this.compiler.run = () => run.call(this.compiler, this.messageOutPut.bind(this))
@@ -134,13 +135,13 @@ class MiniPlugin extends MiniProgam {
       for (const chunk of chunks) {
         if (chunk.hasEntryModule() && !ignoreEntrys.indexOf(chunk.name) !== 0) {
           // 记录模块之间依赖关系
-          for (const module of chunk.getModules()) 
+          for (const module of chunk.getModules())
             if (!module.isEntryModule()) {
               const resourcePath = module.resource
               let relPath = this.getDistFilePath(resourcePath)
               let chunkName = chunk.name + '.js'
               utils.setMapValue(DEPS_MAP, relPath, chunkName)
-              
+
               module._usedModules = DEPS_MAP[relPath]
             }
         }
@@ -214,9 +215,9 @@ class MiniPlugin extends MiniProgam {
     if (this.options.setSubPackageCacheGroup) {
       let groups = this.options.setSubPackageCacheGroup(this, appJson)
       Object.assign(cachegroups, groups)
-      return 
+      return
     }
-    
+
     for (const { root } of appJson.subPackages) {
       let name = root.replace('/', '')
 
@@ -244,12 +245,12 @@ class MiniPlugin extends MiniProgam {
 
   /**
    * 设置组件被依赖的关系
-   * @param {*} components 
-   * @param {*} resourcePath 
+   * @param {*} components
+   * @param {*} resourcePath
    */
   setComponentDeps(components, resourcePath) {
     let pagePath = this.getDistFilePath(resourcePath).replace(/\.json$/, '')
-    
+
     for (let component of components) {
       component = this.getDistFilePath(component)
       utils.setMapValue(COMPONENT_DEPS_MAP, component, pagePath)
@@ -259,12 +260,12 @@ class MiniPlugin extends MiniProgam {
   /**
    * 输出打包进度
    * @param {String} progress 进度
-   * @param {String} event 
-   * @param {*} modules 
+   * @param {String} event
+   * @param {*} modules
    */
   progress (progress, event, modules) {
-    stdout.clearLine()
-    stdout.cursorTo(0)
+    readline.clearLine(process.stdout);
+    readline.cursorTo(process.stdout, 0);
 
     if (+progress === 1) return
     stdout.write(`${'正在打包: '.gray} ${`${(progress * 100).toFixed(2)}%`.green} ${event || ''} ${modules || ''}`)
@@ -342,7 +343,7 @@ class MiniPlugin extends MiniProgam {
         }
       }
       commonWarnings = commonWarnings.sort(compare)
-      
+
       for (const key in DEPS_MAP) {
         const files = analyzeMap.fileUsed[key] = Array.from(DEPS_MAP[key])
 
@@ -378,7 +379,7 @@ class MiniPlugin extends MiniProgam {
       console.log('')
       commonWarnings.length > 0 && console.log('建议检查以下子包，并移动独用文件到子包内'.red)
       commonWarnings.forEach(message => console.log('提示'.yellow, message))
-      
+
       if (fileWarnings.length || commonWarnings.length || componentWarnings.length) {
         console.log('')
         console.log(`你可以在 ${join(this.compiler.context, 'analyze.json')} 中查看详细信息`.yellow)
