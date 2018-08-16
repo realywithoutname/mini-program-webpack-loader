@@ -88,6 +88,7 @@ module.exports = class MiniProgam {
       window,
       networkTimeout,
       debug,
+      functionalPages,
       plugins = {}
     } = config;
 
@@ -119,6 +120,7 @@ module.exports = class MiniProgam {
     this.appJsonCode.window = this.appJsonCode.window || window;
     this.appJsonCode.networkTimeout = this.appJsonCode.networkTimeout || networkTimeout;
     this.appJsonCode.debug = this.appJsonCode.debug || debug;
+    this.appJsonCode.functionalPages = this.appJsonCode.functionalPages || functionalPages
   }
 
   getAppWxss(compilation) {
@@ -206,6 +208,14 @@ module.exports = class MiniProgam {
   }
 
   async loadEntrys(entry) {
+    if (typeof entry === 'object' && entry !== null) {
+      Object.keys(entry).forEach((key) => {
+        if (/\.json/.test(entry[key])) {
+          this.chunkNames.push(key)
+          entry.push(entry[key])
+        }
+      })
+    }
     this.entrys = entry = typeof entry === typeof '' ? [entry] : entry;
     this.checkEntry(entry);
     let index = 0;
