@@ -208,14 +208,6 @@ module.exports = class MiniProgam {
   }
 
   async loadEntrys(entry) {
-    if (typeof entry === 'object' && entry !== null) {
-      Object.keys(entry).forEach((key) => {
-        if (/\.json/.test(entry[key])) {
-          this.chunkNames.push(key)
-          entry.push(entry[key])
-        }
-      })
-    }
     this.entrys = entry = typeof entry === typeof '' ? [entry] : entry;
     this.checkEntry(entry);
     let index = 0;

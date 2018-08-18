@@ -62,8 +62,8 @@ class MiniPlugin extends MiniProgam {
         resolver.resolve({}, context, request, {}, (err, res) => err ? reject(err) : resolve(res))
       })
     }
-    // 加载入口文件，必须在 environment 前完成
-    // this.loadEntrys(this.compiler.options.entry);
+    
+    this.miniEntrys = utils.formatEntry(compiler.options.entry, this.chunkNames)
 
     // 获取打包后路径（在 loader 中有使用）
     this.getDistFilePath = () => {};
@@ -77,7 +77,7 @@ class MiniPlugin extends MiniProgam {
   }
 
   beforeCompile(params, callback) {
-    this.loadEntrys(this.compiler.options.entry)
+    this.loadEntrys(this.miniEntrys)
       .then(() => {
         let resourcePaths = new Set(
           this.entryContexts.concat(

@@ -160,3 +160,20 @@ exports.setMapValue = (origin, protertyName, value) => {
     proterty.add(value)
   }
 }
+
+exports.formatEntry = (entry, chunkNames) => {
+  let miniEntrys = []
+  if (typeof entry === 'object' && entry !== null) {
+    Object.keys(entry).forEach((key) => {
+      if (/\.json/.test(entry[key])) {
+        chunkNames.push(key)
+        miniEntrys.push(entry[key])
+      }
+    })
+  }
+
+  if (Array.isArray(entry)) miniEntrys = entry
+  if (typeof entry === 'string') miniEntrys = [entry]
+  
+  return miniEntrys
+}

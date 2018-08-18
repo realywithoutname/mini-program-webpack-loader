@@ -2,7 +2,7 @@
   "name": "mini-program-webpack-loader",
   "version": "0.1.10",
   "description": "mini-program webpack loader",
-  "main": "lib/index.js",
+  "main": "src/index.js",
   "scripts": {
     "build": "npx babel src --out-dir lib",
     "test": "echo \"just demo\" && exit 1"
