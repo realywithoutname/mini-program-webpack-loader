@@ -303,7 +303,7 @@ class MiniPlugin extends MiniProgam {
       component: this.componentSet.size,
       subpackage: this.subpackageMap.size + '/' + subPackagePages,
       duration: ((endTime - startTime) / 1000 + 's').green,
-      size: ((size / 1024).toFixed(2) + ' m').green,
+      size: ((size / 1024).toFixed(2) + ' k').green,
       hash
     }];
 
@@ -394,6 +394,8 @@ class MiniPlugin extends MiniProgam {
 
     console.log('')
     console.table(ot);
+
+    this.options.compilationFinish && this.options.compilationFinish(err, stat, this.getAppJson())
   }
 
   consoleMsg (messages) {
