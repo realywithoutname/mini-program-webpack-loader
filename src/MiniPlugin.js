@@ -11,7 +11,7 @@ const {
   isAbsolute
 } = require('path');
 const { ProgressPlugin } = require('webpack')
-
+const { ConcatSource } = require('webpack-sources')
 const loader = require('./loader');
 const utils = require('./utils');
 const MiniTemplate = require('./MiniTemplate');
@@ -122,6 +122,13 @@ class MiniPlugin extends MiniProgam {
      * 标准输出文件名称
      */
     compilation.mainTemplate.hooks.assetPath.tap('MiniPlugin', this.getAesstPathHook.bind(this));
+
+    compilation.hooks.additionalAssets.tapAsync('MiniPlugin', callback => {
+      compilation.assets['webpack-require.js'] = new ConcatSource(
+        fs.readFileSync(join(__dirname, './lib/require.js'), 'utf8')
+      );
+      callback()
+    });
 
     /**
      * 检查是否有需要动态添加的入口文件，如果有需要重新编译
