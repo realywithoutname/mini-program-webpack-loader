@@ -1,6 +1,8 @@
-const fs = require('fs')
-const path = require('path');
+// const fs = require('fs')
+const path = require('path')
 const utils = require('./utils')
+const WXLoaderHelper = require('./wx/loader')
+const AliLoaderHelper = require('./ali/loader')
 
 const isWxml = src => /.wxml$/.test(src)
 const isWxss = src => /.wxss$/.test(src)
@@ -10,35 +12,44 @@ const isScss = src => /.scss$/.test(src)
 const isPcss = src => /.pcss$/.test(src)
 const isInvaild = src => isWxml(src) || isWxss(src) || isWxs(src) || isJson(src) || isScss(src) || isPcss(src)
 
+/* eslint-disable */
 String.prototype.replaceAll = function (str, replacement) {
   return this.replace(new RegExp(str, 'gm'), replacement)
 }
 
 class MiniLoader {
-  constructor(loader, code) {
+  constructor (loader, code) {
     this.loader = loader
     this.source = code
     this.resourcePath = loader.resourcePath
     this.callback = loader.async()
     this.context = loader.context
+
     this.resolveDistPath = this.$plugin && this.$plugin.getDistFilePath
+
+    this.targetHelper = this.$plugin.options.target === 'ali'
+      ? new AliLoaderHelper()
+      : new WXLoaderHelper()
 
     this.resolve = (context, request) => new Promise((resolve, reject) => {
       loader.resolve(context, request, (err, result) => err ? reject(err) : resolve(result))
-    });
+    })
 
     this.parser()
   }
 
-  parser() {
+  get DepReg () {
     const wxmlDepsReg = /src=('|")([^"]*)('|")/g
     const wxssDepsReg = /@import ('|")([^"].+?)('|");/g
     const wxsDepsReg = /require\(('|")([^)]*.wxs)('|")\)/g
-    let resourcePath = this.loader.resourcePath
-    let code = this.source
-    let reg = isWxml(resourcePath) ? wxmlDepsReg : isWxss(resourcePath) ? wxssDepsReg : isWxs(resourcePath) ? wxsDepsReg : false
+    let resourcePath = this.resourcePath
+    return isWxml(resourcePath) ? wxmlDepsReg : isWxss(resourcePath) ? wxssDepsReg : isWxs(resourcePath) ? wxsDepsReg : false
+  }
 
-    const parserPromise = reg ? this.customParser(reg) : this.jsonParser()
+  parser () {
+    const parserPromise = !isJson(this.resourcePath)
+      ? this.customParser(this.DepReg)
+      : this.jsonParser()
 
     parserPromise
       .then(code => {
@@ -47,7 +58,7 @@ class MiniLoader {
       .catch(this.callback)
   }
 
-  async customParser(reg) {
+  async customParser (reg) {
     return this.loadDeps(reg)
       .then(map => {
         let depsPromise = []
@@ -66,7 +77,10 @@ class MiniLoader {
 
           deps.push(value.sourcePath)
         }
-        
+        code = isWxml(this.resourcePath) && this.targetHelper.transformWxml
+          ? this.targetHelper.transformWxml(code)
+          : code
+
         this.$plugin.addListenFiles(deps)
 
         return Promise.all(depsPromise)
@@ -79,10 +93,10 @@ class MiniLoader {
       })
   }
 
-  async jsonParser() {
+  async jsonParser () {
     let json = JSON.parse(this.source)
     let { componentGenerics, usingComponents, pages = [], subPackages = [] } = json
-    
+
     if (pages.length || subPackages.length) {
       this.$plugin.appJsonChange(json, this.resourcePath)
       return this.source
@@ -95,14 +109,14 @@ class MiniLoader {
 
     async function setConponentFiles (component) {
       component = component + '.json'
-  
+
       // 获取自定义组件的绝对路径
       let absPath = await this.resolve(this.context, component)
-  
+
       // 获取依赖的实际文件列表
       let dir = path.dirname(absPath)
       let name = path.basename(absPath, '.json')
-      
+
       // 新增到编译的组件以及组件对应的文件
       assets = assets.concat(utils.getFiles(dir, name))
       components.push(path.join(dir, name))
@@ -128,7 +142,7 @@ class MiniLoader {
     for (const key in componentGenerics) {
       if (typeof componentGenerics[key] === 'object') {
         for (const _key in componentGenerics[key]) {
-          let element = componentGenerics[key][_key];
+          let element = componentGenerics[key][_key]
           componentGenerics[key][_key] = await setConponentFiles.call(this, element)
         }
       }
@@ -138,20 +152,20 @@ class MiniLoader {
      * 通知插件，下次编译的时候要把这些文件加到编译中
      */
     this.$plugin.addNewConponentFiles(assets, components, this.resourcePath)
-    
+
     return JSON.stringify(json, null, 2)
   }
 
-  addDepsModule(request) {
+  addDepsModule (request) {
     return new Promise((resolve, reject) => {
       // this.loader.addDependency(request)
       this.loader.loadModule(request, (err, src) => {
         err ? reject(err) : resolve(src)
-      });
+      })
     })
   }
 
-  async loadDeps(reg) {
+  async loadDeps (reg) {
     let matched = null
     let map = new Map()
 
@@ -175,9 +189,7 @@ class MiniLoader {
       if (!map.has(dep)) {
         map.set(dep, {
           origin: dep, // 原来代码中的依赖路径
-          replace: (isScss(relPath) || isPcss(relPath)) 
-            ? relPath.replace('.scss', '.wxss').replace('.pcss', '.wxss') /* wxss 文件支持 scss 文件的引用，打包后需要换后缀 */ 
-            : relPath, // 替换路径
+          replace: this.getDepReplacePath(relPath), // 替换路径
           sourcePath: absPath // 依赖文件，用于动态添加依赖
         })
       }
@@ -186,18 +198,31 @@ class MiniLoader {
     return map
   }
 
+  getDepReplacePath (path) {
+    return isWxss(path)
+      ? this.targetHelper.TWxss(path)
+      : isWxml(path)
+        ? this.targetHelper.TWxml(path)
+        : isScss(path)
+          ? this.targetHelper.TScss(path)
+          : isPcss(path)
+            ? this.targetHelper.TPcss(path)
+            : isWxs(path)
+              ? this.targetHelper.TWxs(path)
+              : path
+  }
   /**
    * 根据当前文件打包后的路径以及依赖文件的路径打包路径计算依赖的相对路径
-   * @param {*} dep 
+   * @param {*} dep
    */
-  getRelativePath(dep) {
+  getRelativePath (dep) {
     let originPath = this.resolveDistPath(this.resourcePath)
     let depPath = this.resolveDistPath(dep)
 
     return './' + path.relative(path.dirname(originPath), depPath)
   }
 
-  async getAbsolutePath(context, dep) {
+  async getAbsolutePath (context, dep) {
     /**
      * 绝对路径则把前面的 / 去掉，需要在 resolve.alias 中做相应配置，主要是兼容有赞小程序历史写法
      * 相对路径则使用相对路径
@@ -207,17 +232,15 @@ class MiniLoader {
     let absPath = await this.resolve(context, dep)
     return absPath
   }
-
 }
 
 module.exports = function (content) {
-  this.cacheable && this.cacheable();
+  this.cacheable && this.cacheable()
   const resourcePath = this.resourcePath
-
 
   if (!isWxml(resourcePath) && !isWxss(resourcePath) && !isWxs(resourcePath) && !isJson(this.resourcePath)) return this.callback('Loader 不支持的文件类型', content)
 
-  new MiniLoader(this, content)
+  return new MiniLoader(this, content)
 }
 
 module.exports.$applyPluginInstance = function (plugin) {
