@@ -38,7 +38,8 @@ module.exports = class MiniProgam {
     this.appJsonCode = {
       pages: [],
       subPackages: [],
-      plugins: {}
+      plugins: {},
+      preloadRule: {}
     };
 
     this.filesSet = new Set();
@@ -56,6 +57,8 @@ module.exports = class MiniProgam {
     this.entrys.forEach((entry) => {
       code.pages = code.pages.concat(code[entry].pages);
       code.subPackages = code.subPackages.concat(code[entry].subPackages);
+
+      Object.assign(code.preloadRule, code[entry].preloadRule)
       delete code[entry];
     });
 
@@ -101,6 +104,7 @@ module.exports = class MiniProgam {
     const {
       pages = [],
       subPackages = [],
+      preloadRule = {},
       tabBar,
       window,
       networkTimeout,
@@ -116,8 +120,8 @@ module.exports = class MiniProgam {
      */
     appJson.pages = pages;
     appJson.subPackages = subPackages;
+    appJson.preloadRule = preloadRule
     this.appJsonCode.tabBar = this.appJsonCode.tabBar || tabBar;
-
     /**
      * 插件
      */
