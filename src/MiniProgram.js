@@ -59,6 +59,22 @@ module.exports = class MiniProgam {
       delete code[entry];
     });
 
+    let subPackages = code.subPackages || []
+    let copy = {}
+    subPackages.forEach(pack => {
+      if (copy[pack.root]) copy[pack.root].pages = copy[pack.root].pages.concat(pack.pages)
+      else copy[pack.root] = pack
+    })
+
+    subPackages = code.subPackages = []
+
+    Object.keys(copy).forEach(root => {
+      let pack = copy[root]
+      pack.pages = [...new Set(pack.pages)]
+      subPackages.push(pack)
+    })
+
+
     code.pages = [...new Set(code.pages)]
     Object.keys(code).forEach(() => {
       if (!code.key) delete code.key;
