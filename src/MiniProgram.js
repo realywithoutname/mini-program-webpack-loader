@@ -38,8 +38,9 @@ module.exports = class MiniProgam {
     this.appJsonCode = {
       pages: [],
       subPackages: [],
-      plugins: {}
-    }
+      plugins: {},
+      preloadRule: {}
+    };
 
     this.filesSet = new Set()
     this.pagesSet = new Set()
@@ -54,10 +55,28 @@ module.exports = class MiniProgam {
     let code = Object.assign({}, this.appJsonCode)
 
     this.entrys.forEach((entry) => {
-      code.pages = code.pages.concat(code[entry].pages)
-      code.subPackages = code.subPackages.concat(code[entry].subPackages)
-      delete code[entry]
+      code.pages = code.pages.concat(code[entry].pages);
+      code.subPackages = code.subPackages.concat(code[entry].subPackages);
+
+      Object.assign(code.preloadRule, code[entry].preloadRule)
+      delete code[entry];
+    });
+
+    let subPackages = code.subPackages || []
+    let copy = {}
+    subPackages.forEach(pack => {
+      if (copy[pack.root]) copy[pack.root].pages = copy[pack.root].pages.concat(pack.pages)
+      else copy[pack.root] = pack
     })
+
+    subPackages = code.subPackages = []
+
+    Object.keys(copy).forEach(root => {
+      let pack = copy[root]
+      pack.pages = [...new Set(pack.pages)]
+      subPackages.push(pack)
+    })
+
 
     code.pages = [...new Set(code.pages)]
     Object.keys(code).forEach(() => {
@@ -81,6 +100,7 @@ module.exports = class MiniProgam {
     const {
       pages = [],
       subPackages = [],
+      preloadRule = {},
       tabBar,
       window,
       networkTimeout,
@@ -94,10 +114,10 @@ module.exports = class MiniProgam {
     /**
      * 保存 app.json 中的内容
      */
-    appJson.pages = pages
-    appJson.subPackages = subPackages
-    this.appJsonCode.tabBar = this.appJsonCode.tabBar || tabBar
-
+    appJson.pages = pages;
+    appJson.subPackages = subPackages;
+    appJson.preloadRule = preloadRule
+    this.appJsonCode.tabBar = this.appJsonCode.tabBar || tabBar;
     /**
      * 插件
      */
