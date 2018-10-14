@@ -8,7 +8,8 @@ const isWxs = src => /.wxs$/.test(src)
 const isJson = src => /.json$/.test(src)
 const isScss = src => /.scss$/.test(src)
 const isPcss = src => /.pcss$/.test(src)
-const isInvaild = src => isWxml(src) || isWxss(src) || isWxs(src) || isJson(src) || isScss(src) || isPcss(src)
+const isLess = src => /.less$/.test(src)
+const isInvaild = src => isWxml(src) || isWxss(src) || isWxs(src) || isJson(src) || isScss(src) || isPcss(src) || isLess(src)
 
 String.prototype.replaceAll = function (str, replacement) {
   return this.replace(new RegExp(str, 'gm'), replacement)
@@ -175,8 +176,8 @@ class MiniLoader {
       if (!map.has(dep)) {
         map.set(dep, {
           origin: dep, // 原来代码中的依赖路径
-          replace: (isScss(relPath) || isPcss(relPath)) 
-            ? relPath.replace('.scss', '.wxss').replace('.pcss', '.wxss') /* wxss 文件支持 scss 文件的引用，打包后需要换后缀 */ 
+          replace: (isScss(relPath) || isPcss(relPath)) || isLess(relPath)
+            ? relPath.replace('.scss', '.wxss').replace('.pcss', '.wxss').replace('.less', '.wxss') /* wxss 文件支持 scss 文件的引用，打包后需要换后缀 */ 
             : relPath, // 替换路径
           sourcePath: absPath // 依赖文件，用于动态添加依赖
         })
