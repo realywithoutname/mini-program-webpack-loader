@@ -1,4 +1,8 @@
 module.exports = class AliLoaderHelper {
+  constructor (loader) {
+    this.loader = loader
+  }
+  
   transformWxss (content) {
     return content
   }
@@ -12,6 +16,7 @@ module.exports = class AliLoaderHelper {
       return `${$1 === 'bind' ? 'on' : 'catch'}${$2[0].toUpperCase()}${$2.substr(1)}=`
     })
 
+    content = content.replace(/<import.+?src=.+?[\/>.+?</import]>\n/g, '')
     return content
   }
 

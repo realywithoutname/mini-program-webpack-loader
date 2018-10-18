@@ -46,6 +46,7 @@ module.exports = class MiniProgam {
     this.pagesSet = new Set()
     this.componentSet = new Set()
     this.subpackageMap = new Map()
+    this.xmlDepsMap = new Map()
   }
 
   getAppJson () {
@@ -180,7 +181,10 @@ module.exports = class MiniProgam {
     let assetFiles = []
     let scriptFiles = files.filter(file => {
       if (this.filesSet.has(file)) return false
-      if (!this.filesSet.has(file)) this.filesSet.add(file)
+      if (!this.filesSet.has(file)) {
+        this.filesSet.add(file)
+        ;/\.wxml$/.test(file) && this.xmlDepsMap.set(file, { isRoot: true, deps: new Map() })
+      }
       return /\.js$/.test(file) ? true : assetFiles.push(file) && false
     })
     this.addAssetsEntry(context, assetFiles)
@@ -516,5 +520,31 @@ module.exports = class MiniProgam {
 
     pageFiles = flattenDeep(pageFiles).filter(file => !this.filesSet.has(file))
     this._appending = this._appending.concat(pageFiles)
+  }
+
+  addWxmlDeps (resourcePath, deps) {
+    if (this.xmlDepsMap.has(resourcePath)) {
+      let target = this.xmlDepsMap.get(resourcePath)
+      let children = target.deps
+      
+      deps.forEach(path => {
+        if (this.xmlDepsMap.has(path) && target.isLoaded) {
+          return
+        }
+
+        let pathQuery = {
+          deps: new Map()
+        }
+
+        children.set(path, pathQuery)
+        this.xmlDepsMap.set(path, pathQuery)
+      })
+
+      target.isLoaded = true
+
+      return
+    }
+
+    throw new Error('unbeliveable')
   }
 }

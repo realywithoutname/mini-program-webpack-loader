@@ -1,3 +1,5 @@
+function noop() {}
+
 const _afAppx = __webpack_require__(/*! @alipay/af-appx */ '@alipay/af-appx')
 
 // debugger
@@ -10,7 +12,18 @@ Object.assign(
       console.log('FUCK 小程序')
     },
 
-    request: origin.httpRequest,
+    request (options) {
+      let success = options.success || noop
+      let fail = options.fail || noop
+      options.success = function (response) {
+        response.statusCode = response.status
+        success(response)
+      }
+      options.fail = function (error) {
+        fail(error)
+      }
+      origin.httpRequest(options)
+    },
     // setStorage(key, data) {
     //   return origin.setStorage({})
     // },
@@ -33,6 +46,8 @@ Object.assign(
 
     setStorageSync (key, data) {
       return origin.setStorageSync({ key, data })
-    }
+    },
+
+    showTabBar () {}
   }
 )

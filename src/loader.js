@@ -28,8 +28,8 @@ class MiniLoader {
     this.resolveDistPath = this.$plugin && this.$plugin.getDistFilePath
 
     this.targetHelper = this.$plugin.options.target === 'ali'
-      ? new AliLoaderHelper()
-      : new WXLoaderHelper()
+      ? new AliLoaderHelper(this)
+      : new WXLoaderHelper(this)
 
     this.resolve = (context, request) => new Promise((resolve, reject) => {
       loader.resolve(context, request, (err, result) => err ? reject(err) : resolve(result))
@@ -81,6 +81,10 @@ class MiniLoader {
           ? this.targetHelper.transformWxml(code)
           : code
 
+        if (isWxml(this.resourcePath)) {
+          this.$plugin.addWxmlDeps(this.resourcePath, deps)
+        }
+        
         this.$plugin.addListenFiles(deps)
 
         return Promise.all(depsPromise)

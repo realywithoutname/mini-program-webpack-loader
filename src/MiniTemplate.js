@@ -18,7 +18,7 @@ module.exports = class MiniTemplate {
 
     compiler.hooks.compilation.tap('MiniTemplate', (compilation) => {
       this.compilation = compilation
-      
+
       compilation.mainTemplate.hooks.render.tap('MiniTemplate', this.setRender.bind(this))
     })
   }

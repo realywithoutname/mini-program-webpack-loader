@@ -211,7 +211,13 @@ class MiniPlugin extends MiniProgam {
         delete assets[file]
       }
     }
-    callback()
+
+    if (this.options.target === 'ali') {
+      assets['app.acss'] = assets['app.wxss']
+      delete assets['app.wxss']
+    }
+
+    this.helperPlugin.emitHook(compilation, callback)
   }
 
   setCacheGroup () {

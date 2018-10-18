@@ -18,4 +18,8 @@ module.exports = class WxPluginHelper {
   getAppJsCode (content) {
     return content
   }
+
+  emitHook(compilation, callback) {
+    callback()
+  }
 }

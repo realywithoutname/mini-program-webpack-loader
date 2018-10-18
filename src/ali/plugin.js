@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const webpack = require('webpack')
 const { ConcatSource } = require('webpack-sources')
-
+const transXml = require('./transxml')
 module.exports = class AliPluginHelper {
   constructor (miniPlugin) {
     this.$plugin = miniPlugin
@@ -20,7 +20,8 @@ module.exports = class AliPluginHelper {
         return Object.assign(global, app)
       })
       `,
-      Component: '(_afAppx.WorkerComponent || function () {})',
+      __wxConfig: JSON.stringify(null),
+      Component: `global.Component`,
       Behavior: '(function (args) { return args })'
     }).apply(compiler)
   }
@@ -41,6 +42,16 @@ module.exports = class AliPluginHelper {
       })
       callback()
     })
+
+    // compilation.hooks.additionalAssets.tapAsync('MiniPlugin', callback => {
+    //   compilation.assets['component.js'] = new ConcatSource(
+    //     fs.readFileSync(path.join(__dirname, './lib/component.js'), 'utf8')
+    //   );
+    //   compilation.assets['my-sdk.js'] = new ConcatSource(
+    //     fs.readFileSync(path.join(__dirname, './lib/my.js'), 'utf8')
+    //   );
+    //   callback()
+    // });
   }
 
   getAppJsonCode () {
@@ -53,8 +64,16 @@ module.exports = class AliPluginHelper {
     return new ConcatSource(
       `require('${
         path.relative(this.$plugin.outputPath, path.resolve(__dirname, './lib/my.js'))
-      }')\n`,
+      }');\n`,
+      `require('${
+        path.relative(this.$plugin.outputPath, path.resolve(__dirname, './lib/component.js'))
+      }');\n`,
       content
     )
+  }
+
+  emitHook(compilation, callback) {
+    transXml(compilation, this.$plugin)
+    callback()
   }
 }
