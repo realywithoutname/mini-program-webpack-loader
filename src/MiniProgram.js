@@ -39,7 +39,8 @@ module.exports = class MiniProgam {
       pages: [],
       subPackages: [],
       plugins: {},
-      preloadRule: {}
+      preloadRule: {},
+      usingComponents: {}
     };
 
     this.filesSet = new Set();
@@ -59,6 +60,7 @@ module.exports = class MiniProgam {
       code.subPackages = code.subPackages.concat(code[entry].subPackages);
 
       Object.assign(code.preloadRule, code[entry].preloadRule)
+      Object.assign(code.usingComponents, code[entry].usingComponents)
       delete code[entry];
     });
 
@@ -105,6 +107,7 @@ module.exports = class MiniProgam {
       pages = [],
       subPackages = [],
       preloadRule = {},
+      usingComponents = {},
       tabBar,
       window,
       networkTimeout,
@@ -120,7 +123,8 @@ module.exports = class MiniProgam {
      */
     appJson.pages = pages;
     appJson.subPackages = subPackages;
-    appJson.preloadRule = preloadRule
+    appJson.preloadRule = preloadRule;
+    appJson.usingComponents = usingComponents;
     this.appJsonCode.tabBar = this.appJsonCode.tabBar || tabBar;
     /**
      * 插件

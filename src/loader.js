@@ -86,7 +86,6 @@ class MiniLoader {
     
     if (pages.length || subPackages.length) {
       this.$plugin.appJsonChange(json, this.resourcePath)
-      return this.source
     }
 
     if (!usingComponents && !componentGenerics) return this.source
