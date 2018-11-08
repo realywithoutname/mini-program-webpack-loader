@@ -276,6 +276,8 @@ module.exports = class MiniProgam {
       
       let componentSet = new Set()
 
+      pageFiles.push(entryPath)
+
       promiseSet.add(
         this.loadComponentsFiles(pageFiles, componentSet)
           .then(() => {
