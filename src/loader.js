@@ -28,7 +28,7 @@ class MiniLoader {
     this.resolveDistPath = this.$plugin && this.$plugin.getDistFilePath
 
     this.targetHelper = this.$plugin.options.target === 'ali'
-      ? new AliLoaderHelper(this)
+      ? new AliLoaderHelper(this, this.$plugin)
       : new WXLoaderHelper(this)
 
     this.resolve = (context, request) => new Promise((resolve, reject) => {

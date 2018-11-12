@@ -1,8 +1,9 @@
 const fs = require('fs')
 const path = require('path')
 const webpack = require('webpack')
-const { ConcatSource } = require('webpack-sources')
+const { ConcatSource, OriginalSource } = require('webpack-sources')
 const transXml = require('./transxml')
+
 module.exports = class AliPluginHelper {
   constructor (miniPlugin) {
     this.$plugin = miniPlugin
@@ -11,6 +12,7 @@ module.exports = class AliPluginHelper {
   apply (compiler) {
     new webpack.DefinePlugin({
       wx: 'my',
+      App: '_afAppx.App',
       Page: '_afAppx.Page',
       getApp: `
       (function () {
@@ -43,19 +45,49 @@ module.exports = class AliPluginHelper {
       callback()
     })
 
-    // compilation.hooks.additionalAssets.tapAsync('MiniPlugin', callback => {
-    //   compilation.assets['component.js'] = new ConcatSource(
-    //     fs.readFileSync(path.join(__dirname, './lib/component.js'), 'utf8')
-    //   );
-    //   compilation.assets['my-sdk.js'] = new ConcatSource(
-    //     fs.readFileSync(path.join(__dirname, './lib/my.js'), 'utf8')
-    //   );
-    //   callback()
-    // });
+    // compilation.hooks.optimizeModulesBasic.tap('MiniPlugin', modules => {
+    //   modules.forEach(module => {
+    //     let code = module.source()
+    //     code = code.replace(/this\.setData/g, 'this.setAliData')
+    //     module._source = new OriginalSource(code)
+    //   })
+    // })
+
+    compilation.hooks.buildModule.tap('MiniPlugin', module => {
+      // console.log(module.source())
+      // modules.forEach(module => {
+      // let code = module.source()
+      // code = code.replace(/this\.setData/g, 'this.setAliData')
+      // module._source = new OriginalSource(code)
+      // })
+    })
   }
 
   getAppJsonCode () {
-    return new ConcatSource(JSON.stringify(this.$plugin.getAppJson(), null, 2))
+    const app = this.$plugin.getAppJson()
+    const { subPackages, tabBar, pages: originPages } = app
+
+    subPackages.forEach(({ root, pages }) => {
+      pages.forEach(page => {
+        originPages.push(path.join(root, page))
+      })
+    })
+
+    tabBar.textColor = tabBar.color
+    tabBar.items = tabBar.list.map(item => {
+      item.name = item.text
+      item.icon = item.iconPath
+      item.activeIcon = item.selectedIconPath
+      delete item.text
+      delete item.iconPath
+      delete item.selectedIconPath
+
+      return item
+    })
+
+    delete tabBar.list
+
+    return new ConcatSource(JSON.stringify(app, null, 2))
   }
 
   getAppJsCode (content) {
@@ -65,6 +97,7 @@ module.exports = class AliPluginHelper {
       `require('${
         path.relative(this.$plugin.outputPath, path.resolve(__dirname, './lib/my.js'))
       }');\n`,
+      `require('./mixin.js');\n`,
       `require('${
         path.relative(this.$plugin.outputPath, path.resolve(__dirname, './lib/component.js'))
       }');\n`,
@@ -72,8 +105,9 @@ module.exports = class AliPluginHelper {
     )
   }
 
-  emitHook(compilation, callback) {
+  emitHook (compilation, callback) {
     transXml(compilation, this.$plugin)
-    callback()
+      .then(() => callback())
+      .catch(err => console.log(err))
   }
 }

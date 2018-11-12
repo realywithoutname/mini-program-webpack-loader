@@ -1,4 +1,4 @@
-function noop() {}
+function noop () {}
 
 const _afAppx = __webpack_require__(/*! @alipay/af-appx */ '@alipay/af-appx')
 
@@ -48,6 +48,16 @@ Object.assign(
       return origin.setStorageSync({ key, data })
     },
 
-    showTabBar () {}
+    showTabBar () {},
+
+    startPullDownRefresh () {
+
+    },
+
+    setNavigationBarTitle (title) {
+      // return origin.setNavigationBar({
+      //   title
+      // })
+    }
   }
 )

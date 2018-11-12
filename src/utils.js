@@ -7,11 +7,11 @@ const {
 
 const {
   existsSync
-} = require('fs');
+} = require('fs')
 
 const EXTS = ['.js', '.json', '.wxml', '.wxss', '.wxs', '.scss', '.pcss']
 
-async function setConponentFiles(resolver, context, component) {
+async function setConponentFiles (resolver, context, component, componentSet) {
   component = component + '.json'
 
   // 获取自定义组件的绝对路径
@@ -21,11 +21,12 @@ async function setConponentFiles(resolver, context, component) {
   let dir = dirname(absPath)
   let name = basename(absPath, '.json')
 
+  componentSet.add(join(dir, name))
   // 新增到编译的组件以及组件对应的文件
   return exports.getFiles(dir, name)
 }
 
-exports.componentFiles = async (resolver, jsonFile) => {
+exports.componentFiles = async (resolver, jsonFile, componentSet) => {
   let componentJOSN = require(jsonFile)
   let context = dirname(jsonFile)
   let {
@@ -45,7 +46,7 @@ exports.componentFiles = async (resolver, jsonFile) => {
       continue
     }
     filePromise.push(
-      setConponentFiles(resolver, context, component)
+      setConponentFiles(resolver, context, component, componentSet)
     )
   }
 
@@ -55,9 +56,9 @@ exports.componentFiles = async (resolver, jsonFile) => {
   for (const key in componentGenerics) {
     if (typeof componentGenerics[key] === 'object') {
       for (const _key in componentGenerics[key]) {
-        let element = componentGenerics[key][_key];
+        let element = componentGenerics[key][_key]
         filePromise.push(
-          setConponentFiles(resolver, context, element)
+          setConponentFiles(resolver, context, element, componentSet)
         )
       }
     }
@@ -109,7 +110,7 @@ exports.getDistPath = (compilerContext, entryContexts, outPath) => {
 
     /**
      * 如果有 node_modules 字符串，则去模块名称
-     * 如果 app.json 在 node_modules 中，那 path 不应该包含 node_modules 
+     * 如果 app.json 在 node_modules 中，那 path 不应该包含 node_modules
      */
 
     if (npmReg.test(path)) {
@@ -120,16 +121,15 @@ exports.getDistPath = (compilerContext, entryContexts, outPath) => {
   }
 }
 
-
 /**
  * 获取文件路径
- * @param {*} base 
- * @param {*} path 
- * @param {*} exts 
+ * @param {*} base
+ * @param {*} path
+ * @param {*} exts
  */
 exports.getFiles = (base, path = '', exts) => {
   let files = []
-  
+
   path = join(base, path)
 
   for (const ext of (exts || EXTS)) {
@@ -146,10 +146,10 @@ exports.getFiles = (base, path = '', exts) => {
  */
 exports.flattenDeep = (arr) => {
   while (arr.some(item => Array.isArray(item))) {
-    arr = [].concat(...arr);
+    arr = [].concat(...arr)
   }
-  return arr;
-};
+  return arr
+}
 
 exports.setMapValue = (origin, protertyName, value) => {
   let proterty = origin[protertyName]
@@ -174,6 +174,6 @@ exports.formatEntry = (entry, chunkNames) => {
 
   if (Array.isArray(entry)) miniEntrys = entry
   if (typeof entry === 'string') miniEntrys = [entry]
-  
+
   return miniEntrys
 }

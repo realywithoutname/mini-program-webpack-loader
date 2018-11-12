@@ -1,4 +1,4 @@
-const { existsSync } = require('fs')
+const { existsSync, readFileSync } = require('fs')
 const {
   dirname,
   join,
@@ -40,7 +40,7 @@ module.exports = class MiniProgam {
       subPackages: [],
       plugins: {},
       preloadRule: {}
-    };
+    }
 
     this.filesSet = new Set()
     this.pagesSet = new Set()
@@ -56,12 +56,12 @@ module.exports = class MiniProgam {
     let code = Object.assign({}, this.appJsonCode)
 
     this.entrys.forEach((entry) => {
-      code.pages = code.pages.concat(code[entry].pages);
-      code.subPackages = code.subPackages.concat(code[entry].subPackages);
+      code.pages = code.pages.concat(code[entry].pages)
+      code.subPackages = code.subPackages.concat(code[entry].subPackages)
 
       Object.assign(code.preloadRule, code[entry].preloadRule)
-      delete code[entry];
-    });
+      delete code[entry]
+    })
 
     let subPackages = code.subPackages || []
     let copy = {}
@@ -77,7 +77,6 @@ module.exports = class MiniProgam {
       pack.pages = [...new Set(pack.pages)]
       subPackages.push(pack)
     })
-
 
     code.pages = [...new Set(code.pages)]
     Object.keys(code).forEach(() => {
@@ -115,10 +114,10 @@ module.exports = class MiniProgam {
     /**
      * 保存 app.json 中的内容
      */
-    appJson.pages = pages;
-    appJson.subPackages = subPackages;
+    appJson.pages = pages
+    appJson.subPackages = subPackages
     appJson.preloadRule = preloadRule
-    this.appJsonCode.tabBar = this.appJsonCode.tabBar || tabBar;
+    this.appJsonCode.tabBar = this.appJsonCode.tabBar || tabBar
     /**
      * 插件
      */
@@ -142,12 +141,22 @@ module.exports = class MiniProgam {
   }
 
   getAppWxss (compilation) {
+    let ext = '.wxss'
     let entryNames = [...new Set(this.entryNames)]
     let wxssCode = ''
+
+    if (this.options.target === 'ali') {
+      ext = '.acss'
+      wxssCode += `
+        /* polyfill */
+        ${readFileSync(join(__dirname, './ali/lib/base.acss'), 'utf8')}
+      `
+    }
+
     entryNames.forEach((name) => {
-      let code = compilation.assets[name + '.wxss']
+      let code = compilation.assets[name + ext]
       if (code) {
-        wxssCode += `/************ ${name + '.wxss'} *************/\n`
+        wxssCode += `/************ ${name + ext} *************/\n`
         wxssCode += code.source().toString()
       }
     })
@@ -309,7 +318,7 @@ module.exports = class MiniProgam {
     let jsons = pageFiles.filter((file) => /\.json/.test(file))
 
     for (const json of jsons) {
-      let files = await componentFiles(this.resolver, json)
+      let files = await componentFiles(this.resolver, json, this.componentSet)
       files = flattenDeep(files)
       componentSet.add(files)
       await this.loadComponentsFiles(flattenDeep(files), componentSet)
@@ -526,14 +535,19 @@ module.exports = class MiniProgam {
     if (this.xmlDepsMap.has(resourcePath)) {
       let target = this.xmlDepsMap.get(resourcePath)
       let children = target.deps
-      
+
       deps.forEach(path => {
         if (this.xmlDepsMap.has(path) && target.isLoaded) {
+          children.set(path, this.xmlDepsMap.get(path))
           return
         }
 
         let pathQuery = {
           deps: new Map()
+        }
+
+        if (this.xmlDepsMap.has(path)) {
+          pathQuery = this.xmlDepsMap.get(path)
         }
 
         children.set(path, pathQuery)
