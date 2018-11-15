@@ -39,8 +39,14 @@ module.exports = class MiniProgam {
       pages: [],
       subPackages: [],
       plugins: {},
+<<<<<<< HEAD
       preloadRule: {}
     }
+=======
+      preloadRule: {},
+      usingComponents: {}
+    };
+>>>>>>> @{-1}
 
     this.filesSet = new Set()
     this.pagesSet = new Set()
@@ -60,8 +66,14 @@ module.exports = class MiniProgam {
       code.subPackages = code.subPackages.concat(code[entry].subPackages)
 
       Object.assign(code.preloadRule, code[entry].preloadRule)
+<<<<<<< HEAD
       delete code[entry]
     })
+=======
+      Object.assign(code.usingComponents, code[entry].usingComponents)
+      delete code[entry];
+    });
+>>>>>>> @{-1}
 
     let subPackages = code.subPackages || []
     let copy = {}
@@ -101,6 +113,7 @@ module.exports = class MiniProgam {
       pages = [],
       subPackages = [],
       preloadRule = {},
+      usingComponents = {},
       tabBar,
       window,
       networkTimeout,
@@ -114,10 +127,18 @@ module.exports = class MiniProgam {
     /**
      * 保存 app.json 中的内容
      */
+<<<<<<< HEAD
     appJson.pages = pages
     appJson.subPackages = subPackages
     appJson.preloadRule = preloadRule
     this.appJsonCode.tabBar = this.appJsonCode.tabBar || tabBar
+=======
+    appJson.pages = pages;
+    appJson.subPackages = subPackages;
+    appJson.preloadRule = preloadRule;
+    appJson.usingComponents = usingComponents;
+    this.appJsonCode.tabBar = this.appJsonCode.tabBar || tabBar;
+>>>>>>> @{-1}
     /**
      * 插件
      */
@@ -281,6 +302,8 @@ module.exports = class MiniProgam {
 
       let componentSet = new Set()
 
+      pageFiles.push(entryPath)
+
       promiseSet.add(
         this.loadComponentsFiles(pageFiles, componentSet)
           .then(() => {
@@ -429,8 +452,13 @@ module.exports = class MiniProgam {
     let usedFiles = module._usedModules
 
     if (!usedFiles) return false
+<<<<<<< HEAD
 
     let reg = new RegExp(root)
+=======
+      
+    let reg = new RegExp(`^${root}`)
+>>>>>>> @{-1}
 
     return !Array.from(usedFiles).some(moduleName => !reg.test(moduleName))
   }

@@ -10,7 +10,8 @@ const isWxs = src => /.wxs$/.test(src)
 const isJson = src => /.json$/.test(src)
 const isScss = src => /.scss$/.test(src)
 const isPcss = src => /.pcss$/.test(src)
-const isInvaild = src => isWxml(src) || isWxss(src) || isWxs(src) || isJson(src) || isScss(src) || isPcss(src)
+const isLess = src => /.less$/.test(src)
+const isInvaild = src => isWxml(src) || isWxss(src) || isWxs(src) || isJson(src) || isScss(src) || isPcss(src) || isLess(src)
 
 /* eslint-disable */
 String.prototype.replaceAll = function (str, replacement) {
@@ -103,7 +104,6 @@ class MiniLoader {
 
     if (pages.length || subPackages.length) {
       this.$plugin.appJsonChange(json, this.resourcePath)
-      return this.source
     }
 
     if (!usingComponents && !componentGenerics) return this.source
@@ -211,9 +211,11 @@ class MiniLoader {
           ? this.targetHelper.TScss(path)
           : isPcss(path)
             ? this.targetHelper.TPcss(path)
-            : isWxs(path)
-              ? this.targetHelper.TWxs(path)
-              : path
+            : isLess(path)
+              ?  this.targetHelper.TPcss(path)
+              : isWxs(path)
+                ? this.targetHelper.TWxs(path)
+                : path
   }
   /**
    * 根据当前文件打包后的路径以及依赖文件的路径打包路径计算依赖的相对路径

@@ -9,7 +9,7 @@ const {
   existsSync
 } = require('fs')
 
-const EXTS = ['.js', '.json', '.wxml', '.wxss', '.wxs', '.scss', '.pcss']
+const EXTS = ['.js', '.json', '.wxml', '.wxss', '.wxs', '.scss', '.pcss', '.less']
 
 async function setConponentFiles (resolver, context, component, componentSet) {
   component = component + '.json'
