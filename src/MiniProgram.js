@@ -427,7 +427,7 @@ module.exports = class MiniProgam {
 
     if (!usedFiles) return false
       
-    let reg = new RegExp(root)
+    let reg = new RegExp(`^${root}`)
 
     return !Array.from(usedFiles).some(moduleName => !reg.test(moduleName))
   }
