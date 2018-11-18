@@ -8,6 +8,9 @@ var triggerEvent = {
   methods: {
     triggerEvent: function (eventName, detail, options) {
       eventName = eventName.replace(/[^a-zA-Z]/, '')
+      /**
+       * 事件处理还有问题，js 和 wxml 处理不一致
+       */
       this.props[eventName] && this.props[eventName]({ detail })
     },
     /**
@@ -19,8 +22,23 @@ var triggerEvent = {
     },
     $_merge: function (prevProps, prevData) {
       if (prevProps !== this.props) {
+        let observers = this.$_observers
         Object.keys(this.props).forEach(prop => {
           this.data[prop] = this.props[prop]
+
+          if (!observers[prop]) return
+          let fn = observers[prop]
+
+          if (typeof observers[prop] === 'string') {
+            fn = this[fn]
+          }
+
+          if (typeof fn !== 'function') throw new Error('找不到 observer 对应的方法', prop)
+
+          if (!prevProps || prevProps[prop] !== this.props[prop]) {
+            console.log(this.is, prop, 'change call:', fn.name)
+            fn.call(this, this.props[prop])
+          }
         })
       }
 
@@ -34,6 +52,7 @@ module.exports = global.Component = function (com) {
   const Component = (_afAppx.WorkerComponent || function () {})
   const observers = Object.keys(com.properties || {}).reduce((res, key) => {
     const prop = com.properties[key] || {}
+
     if (prop !== null && typeof prop === 'object' && prop.observer) {
       res[key] = prop.observer
     }
@@ -51,6 +70,7 @@ module.exports = global.Component = function (com) {
     /**
      * 第一次把所有的 props 都传给 data
      */
+    this.$_observers = observers
     this.$_merge(null, this.data)
     com.attached && com.attached.call(this)
     com.ready && com.ready.call(this)
@@ -60,25 +80,6 @@ module.exports = global.Component = function (com) {
     /**
      * prevData !== this.data
      */
-
-    if (prevProps !== this.props) {
-      let props = Object.keys(prevProps)
-      props.forEach((prop) => {
-        if (!observers[prop]) return
-        let fn = observers[prop]
-
-        if (typeof observers[prop] === 'string') {
-          fn = this[fn]
-        }
-
-        if (typeof fn !== 'function') throw new Error('找不到 observer 对应的方法', prop)
-
-        // if (prevProps[prop] !== this.props[prop]) {
-        console.log(this.is, prop, 'change call:', fn.name)
-        fn.call(this, prevProps[prop])
-        // }
-      })
-    }
 
     this.$_merge(prevProps, prevData)
   }
