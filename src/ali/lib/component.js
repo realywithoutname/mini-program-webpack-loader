@@ -17,8 +17,14 @@ var triggerEvent = {
     $_tap: function (e) {
       this.props.onTap && this.props.onTap(e)
     },
-    $_merge: function (isDataUpdate) {
-      this.data = this.properties = this.props = isDataUpdate ? Object.assign(this.props, this.data) : Object.assign(this.data, this.props)
+    $_merge: function (prevProps, prevData) {
+      if (prevProps !== this.props) {
+        Object.keys(this.props).forEach(prop => {
+          this.data[prop] = this.props[prop]
+        })
+      }
+
+      this.properties = this.data
     }
   }
 }
@@ -42,30 +48,39 @@ module.exports = global.Component = function (com) {
   com.props.rootClass = String
 
   com.didMount = function () {
-    this.$_merge(false)
+    /**
+     * 第一次把所有的 props 都传给 data
+     */
+    this.$_merge(null, this.data)
     com.attached && com.attached.call(this)
     com.ready && com.ready.call(this)
   }
+
   com.didUpdate = function (prevProps, prevData) {
-    // console.log(prevProps === this.props, prevData === this.data)
-    // console.log(this.props.list, prevData === this.data)
-    this.$_merge(prevData === this.data)
-    if (prevData !== this.data) {
+    /**
+     * prevData !== this.data
+     */
+
+    if (prevProps !== this.props) {
       let props = Object.keys(prevProps)
       props.forEach((prop) => {
         if (!observers[prop]) return
-
         let fn = observers[prop]
 
         if (typeof observers[prop] === 'string') {
-          fn = this[prop]
+          fn = this[fn]
         }
 
         if (typeof fn !== 'function') throw new Error('找不到 observer 对应的方法', prop)
 
+        // if (prevProps[prop] !== this.props[prop]) {
+        console.log(this.is, prop, 'change call:', fn.name)
         fn.call(this, prevProps[prop])
+        // }
       })
     }
+
+    this.$_merge(prevProps, prevData)
   }
   com.didUnmount = com.detached
 

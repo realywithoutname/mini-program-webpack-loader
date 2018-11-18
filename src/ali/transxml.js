@@ -14,29 +14,59 @@ module.exports = async function (compilation, plugin) {
   assets = compilation.assets
   getDistPath = (src) => plugin.getDistFilePath(src).replace(/\.wxml$/, '.axml')
 
+  /**
+   * Map {
+   *    path: Map {
+   *      isRoot: true,
+   *      deps: {
+   *        path: ...
+   *      }
+   *    }
+   * }
+   */
   plugin.xmlDepsMap.forEach((val, key) => {
+    if (val.isRoot) {
+      rootXmlEntrys.push(key)
+    }
+
+    /**
+     * 减少下面的 parse
+     */
     if (!val.isRoot || val.deps.size === 0) {
       plugin.xmlDepsMap.delete(key)
     }
-
-    if (val.isRoot) {
-      let distPath = getDistPath(key)
-      rootXmlEntrys.push(distPath)
-    }
   })
 
+  /**
+   * 对依赖 template 的 wxml 处理
+   */
   let xmlDepsTree = parseMap(plugin.xmlDepsMap, true)
-  // console.log(plugin.xmlDepsMap)
   let xmlEntrys = Object.keys(xmlDepsTree)
+
   for (const file of xmlEntrys) {
     let distPath = getDistPath(file)
     let content = loadXmlContent(file, file, xmlDepsTree[file])
-    // console.log(file, JSON.stringify(xmlDepsTree[file], null, 2))
     assets[distPath] = formatComponent(file, content)
   }
 
+  /**
+   * 对于没有依赖 template 的 wxml 处理
+   */
+  let rootXmls = []
+  for (const file of rootXmlEntrys) {
+    let distPath = getDistPath(file)
+    rootXmls.push(distPath)
+    assets[distPath] = formatComponent(file, assets[distPath])
+  }
+
+  /**
+   * 对不依赖 wxml 的处理
+   */
   Object.keys(assets).forEach(path => {
-    if (rootXmlEntrys.indexOf(path) === -1 && /\.axml$/.test(path)) {
+    /**
+     * 对于 template 的输出文件删除
+     */
+    if (rootXmls.indexOf(path) === -1 && /\.axml$/.test(path)) {
       // delete assets[path]
     }
   })

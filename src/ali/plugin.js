@@ -73,19 +73,21 @@ module.exports = class AliPluginHelper {
       })
     })
 
-    tabBar.textColor = tabBar.color
-    tabBar.items = tabBar.list.map(item => {
-      item.name = item.text
-      item.icon = item.iconPath
-      item.activeIcon = item.selectedIconPath
-      delete item.text
-      delete item.iconPath
-      delete item.selectedIconPath
+    if (tabBar) {
+      tabBar.textColor = tabBar.color
+      tabBar.items = tabBar.list.map(item => {
+        item.name = item.text
+        item.icon = item.iconPath
+        item.activeIcon = item.selectedIconPath
+        delete item.text
+        delete item.iconPath
+        delete item.selectedIconPath
 
-      return item
-    })
+        return item
+      })
 
-    delete tabBar.list
+      delete tabBar.list
+    }
 
     return new ConcatSource(JSON.stringify(app, null, 2))
   }
