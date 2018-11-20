@@ -2,6 +2,7 @@ const {
   join,
   isAbsolute,
   dirname,
+  relative,
   basename
 } = require('path')
 
@@ -145,4 +146,8 @@ exports.formatEntry = (context = process.cwd(), entry = [], chunkNames = []) => 
   if (!miniEntrys.length) throw new Error('找不到一个有效的入口文件')
 
   return miniEntrys
+}
+
+exports.relative = (from, to) => {
+  return relative(dirname(from), to)
 }

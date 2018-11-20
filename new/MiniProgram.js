@@ -361,7 +361,11 @@ module.exports = class MiniProgam {
     // tabBar icons
     entrys.concat((tabBar && tabBar.list && this.getTabBarIcons(this.mainContext, tabBar.list)) || [])
 
-    this.addEntrys(this.mainContext, flattenDeep(entrys))
+    entrys = flattenDeep(entrys)
+    this.addEntrys(this.mainContext, entrys)
+
+    this.fileTree.setFile(entrys)
+
     return await Promise.all(Array.from(promiseSet))
   }
 

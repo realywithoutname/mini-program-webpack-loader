@@ -4,13 +4,14 @@ const set = (target, key, val) => {
 }
 
 let regRules = {
-  '.js$': meta => set(meta, 'isJS', true),
-  '.json$': meta => set(meta, 'isJSON', true) && set(meta, 'components', new Map()),
+  '.js$': meta => set(meta, 'isJs', true),
+  '.json$': meta => set(meta, 'isJson', true) && set(meta, 'components', new Map()),
   '.wxml$': meta => set(meta, 'isWxml', true),
-  '.wxss$': meta => set(meta, 'isWxss', true)
-  // '.scss$': meta => set(meta, 'isScss', true),
-  // '.pcss$': meta => set(meta, 'isPcss', true),
-  // '.less$': meta => set(meta, 'isLess', true),
+  '.wxs$': meta => set(meta, 'isWxs', true),
+  '.wxss$': meta => set(meta, 'isWxss', true),
+  '.scss$': meta => set(meta, 'isScss', true),
+  '.pcss$': meta => set(meta, 'isPcss', true),
+  '.less$': meta => set(meta, 'isLess', true)
   // '.less$': meta => set(meta, 'isLess', true),
 }
 
@@ -54,9 +55,13 @@ class FileTree {
   }
 
   /**
-   * Map {
+   * json 文件树结构
+   * path: {
+   *  source: filePath,
+   *  isJson: true,
+   *  components: Map {tag: filePath },
    *  files: FileSet, // 有完整的链
-   *  used: FileSet // 没有链
+   *  used: Set { filePath } // 该文件被其他哪些文件引用
    * }
    * @param {*} file
    * @param {*} tag
@@ -83,11 +88,20 @@ class FileTree {
     component.used.add(file)
   }
 
+  /**
+   * 普通文件结构
+   * path: {
+   *  source: filePath,
+   *  deps: FileSet,
+   *  [FILE TYPE]: true
+   * }
+   * @param {*} file
+   * @param {*} depFiles
+   */
   addDeps (file, depFiles) {
     let fileMap = this.tree.get('files')
     let fileMeta = fileMap.get(file)
 
-    !fileMeta && console.log(fileMeta, file)
     fileMeta.deps = this.setFile(depFiles)
   }
 
@@ -110,6 +124,24 @@ class FileTree {
     }
 
     return fileSet
+  }
+
+  getFile (file) {
+    let fileMap = this.tree.get('files')
+    let fileMeta = fileMap.get(file)
+
+    if (!fileMeta) throw new Error('Can`t find file', file)
+
+    return fileMeta
+  }
+
+  removeFile (file) {
+    let fileMap = this.tree.get('files')
+    let fileMeta = fileMap.get(file)
+
+    fileMap.delete(file)
+
+    return fileMeta
   }
 
   clearDepComponents (file) {

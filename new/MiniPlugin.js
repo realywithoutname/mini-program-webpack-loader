@@ -198,10 +198,14 @@ class MiniPlugin extends MiniProgam {
    * @param {Array} assets 组件文件数组
    * @param {Array} components 组件数组
    */
-  async addNewConponentFiles (resourcePath, assets) {
+  addNewConponentFiles (resourcePath, assets) {
     // this.options.analyze && this.setComponentDeps(components, resourcePath)
     // components.forEach(component => !this.componentSet.has(component) && this.componentSet.add(component))
     this._appending = this._appending.concat(assets.filter(file => !this.filesSet.has(file)))
+  }
+
+  newFilesEntryFromLoader (files) {
+    this._appending = this._appending.concat(files.filter(file => !this.filesSet.has(file)))
   }
 
   /**
