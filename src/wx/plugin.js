@@ -1,6 +1,5 @@
-const {
-  ConcatSource
-} = require('webpack-sources')
+const { ConcatSource } = require('webpack-sources')
+const transXml = require('./transxml')
 
 module.exports = class WxPluginHelper {
   constructor (miniPlugin) {
@@ -19,7 +18,9 @@ module.exports = class WxPluginHelper {
     return content
   }
 
-  emitHook(compilation, callback) {
-    callback()
+  emitHook (compilation, callback) {
+    transXml(compilation, this.$plugin)
+      .then(() => callback())
+      .catch(err => console.log(err))
   }
 }

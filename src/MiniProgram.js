@@ -85,7 +85,13 @@ module.exports = class MiniProgam {
       if (!code.key) delete code.key
     })
 
+    delete code.usingComponents
+
     return code
+  }
+
+  getGlobalComponents () {
+    return this.appJsonCode.usingComponents || {}
   }
 
   getExtJson () {
