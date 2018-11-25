@@ -3,6 +3,7 @@ const path = require('path')
 const webpack = require('webpack')
 const { ConcatSource, OriginalSource } = require('webpack-sources')
 const transXml = require('./transxml')
+const { get: getAppJson } = require('../helpers/app')
 
 module.exports = class AliPluginHelper {
   constructor (miniPlugin) {
@@ -64,7 +65,7 @@ module.exports = class AliPluginHelper {
   }
 
   getAppJsonCode () {
-    const app = this.$plugin.getAppJson()
+    const app = getAppJson()
     const { subPackages, tabBar, pages: originPages } = app
 
     subPackages.forEach(({ root, pages }) => {
@@ -73,21 +74,19 @@ module.exports = class AliPluginHelper {
       })
     })
 
-    if (tabBar) {
-      tabBar.textColor = tabBar.color
-      tabBar.items = tabBar.list.map(item => {
-        item.name = item.text
-        item.icon = item.iconPath
-        item.activeIcon = item.selectedIconPath
-        delete item.text
-        delete item.iconPath
-        delete item.selectedIconPath
+    tabBar.textColor = tabBar.color
+    tabBar.items = tabBar.list.map(item => {
+      item.name = item.text
+      item.icon = item.iconPath
+      item.activeIcon = item.selectedIconPath
+      delete item.text
+      delete item.iconPath
+      delete item.selectedIconPath
 
-        return item
-      })
+      return item
+    })
 
-      delete tabBar.list
-    }
+    delete tabBar.list
 
     return new ConcatSource(JSON.stringify(app, null, 2))
   }

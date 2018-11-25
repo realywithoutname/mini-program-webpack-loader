@@ -4,18 +4,34 @@ const {
   join,
   relative,
   extname,
-  basename,
-  isAbsolute
+  basename
 } = require('path')
+const utils = require('./utils')
+const AliPluginHelper = require('./ali/plugin')
+const WxPluginHelper = require('./wx/plugin')
+const FileTree = require('./FileTree')
+const { ProgressPlugin } = require('webpack')
+const loader = require('./loader')
+const MiniTemplate = require('./MiniTemplate')
+
 const { ConcatSource, RawSource } = require('webpack-sources')
 const MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin')
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin')
 
 const {
   flattenDeep,
-  getFiles,
-  componentFiles
+  getFiles
 } = require('./utils')
+const { reslovePagesFiles } = require('./helpers/page')
+const { update: setAppJson, get: getAppJson } = require('./helpers/app')
+const { resolveFilesForPlugin: resolveComponentsFiles } = require('./helpers/component')
+const defaultOptions = {
+  extfile: true,
+  commonSubPackages: true,
+  analyze: false,
+  resources: [],
+  compilationFinish: null
+}
 
 const mainChunkNameTemplate = '__assets_chunk_name__'
 let mainChunkNameIndex = 0
@@ -25,67 +41,38 @@ module.exports = class MiniProgam {
     this.chunkNames = ['main']
 
     this.options = Object.assign(
-      {
-        extfile: true,
-        commonSubPackages: true,
-        analyze: false,
-        resources: [],
-        compilationFinish: null
-      },
+      defaultOptions,
       options
     )
 
-    this.appJsonCode = {
-      pages: [],
-      subPackages: [],
-      plugins: {},
-      preloadRule: {},
-      usingComponents: {}
-    }
+    this.fileTree = new FileTree()
 
-    this.filesSet = new Set()
-    this.pagesSet = new Set()
-    this.componentSet = new Set()
-    this.subpackageMap = new Map()
-    this.xmlDepsMap = new Map()
+    this.helperPlugin = this.options.target === 'ali' ? new AliPluginHelper(this) : new WxPluginHelper(this)
   }
 
-  getAppJson () {
+  apply (compiler) {
+    this.compiler = compiler
+    this.outputPath = compiler.options.output.path
+    this.compilerContext = join(compiler.context, 'src')
+
+    // 向 loader 中传递插件实例
+    loader.$applyPluginInstance(this)
+
+    // 使用模板插件，用于设置输出格式
+    new MiniTemplate(this).apply(compiler)
+    new ProgressPlugin({ handler: this.progress }).apply(compiler)
+
+    this.helperPlugin.apply(compiler)
+
+    this.resolver = utils.createResolver(compiler)
+
     /**
-     *  合并所有 .json 的代码到 app.json
+     * 小程序入口文件
      */
-    let code = Object.assign({}, this.appJsonCode)
+    this.miniEntrys = utils.formatEntry(compiler.context, compiler.options.entry, this.chunkNames)
 
-    this.entrys.forEach((entry) => {
-      code.pages = code.pages.concat(code[entry].pages)
-      code.subPackages = code.subPackages.concat(code[entry].subPackages)
-
-      Object.assign(code.preloadRule, code[entry].preloadRule)
-      Object.assign(code.usingComponents, code[entry].usingComponents)
-      delete code[entry]
-    })
-
-    let subPackages = code.subPackages || []
-    let copy = {}
-    subPackages.forEach(pack => {
-      if (copy[pack.root]) copy[pack.root].pages = copy[pack.root].pages.concat(pack.pages)
-      else copy[pack.root] = pack
-    })
-
-    subPackages = code.subPackages = []
-
-    Object.keys(copy).forEach(root => {
-      let pack = copy[root]
-      pack.pages = [...new Set(pack.pages)]
-      subPackages.push(pack)
-    })
-
-    code.pages = [...new Set(code.pages)]
-    Object.keys(code).forEach(() => {
-      if (!code.key) delete code.key
-    })
-
-    return code
+    // 设置计算打包后路径需要的参数（在很多地方需要使用）
+    utils.setDistParams(this.compilerContext, this.miniEntrys, this.options.resources, this.outputPath)
   }
 
   getExtJson () {
@@ -96,52 +83,6 @@ module.exports = class MiniProgam {
 
     let ext = require(this.options.extfile)
     return new ConcatSource(JSON.stringify(ext, null, 2))
-  }
-
-  setAppJson (config, resourcePath) {
-    const {
-      pages = [],
-      subPackages = [],
-      preloadRule = {},
-      usingComponents = {},
-      tabBar,
-      window,
-      networkTimeout,
-      debug,
-      functionalPages,
-      plugins = {}
-    } = config
-
-    let appJson = this.appJsonCode[resourcePath] = {}
-
-    /**
-     * 保存 app.json 中的内容
-     */
-    appJson.pages = pages
-    appJson.subPackages = subPackages
-    appJson.preloadRule = preloadRule
-    appJson.usingComponents = usingComponents
-    this.appJsonCode.tabBar = this.appJsonCode.tabBar || tabBar
-    /**
-     * 插件
-     */
-    Object.keys(plugins).forEach((key) => {
-      if (this.appJsonCode.plugins[key]) {
-        if (plugins.version !== plugins[key].version) {
-          console.log(`插件 ${key} 在 ${resourcePath} 中使用了和其他入口不同的版本`.yellow)
-        }
-        return
-      }
-      this.appJsonCode.plugins[key] = plugins[key]
-    })
-
-    /**
-     * 其他配置使用最前面的配置
-     */
-    this.appJsonCode.window = this.appJsonCode.window || window
-    this.appJsonCode.networkTimeout = this.appJsonCode.networkTimeout || networkTimeout
-    this.appJsonCode.debug = this.appJsonCode.debug || debug
-    this.appJsonCode.functionalPages = this.appJsonCode.functionalPages || functionalPages
   }
 
   getAppWxss (compilation) {
@@ -192,25 +133,14 @@ module.exports = class MiniProgam {
 
   addEntrys (context, files) {
     let assetFiles = []
-    let scriptFiles = files.filter(file => {
-      if (this.filesSet.has(file)) return false
-      if (!this.filesSet.has(file)) {
-        this.filesSet.add(file)
-        ;/\.wxml$/.test(file) && this.xmlDepsMap.set(file, { isRoot: true, deps: new Map() })
-      }
-      return /\.js$/.test(file) ? true : assetFiles.push(file) && false
-    })
+    let scriptFiles = []
+
+    files = flattenDeep(files)
+
+    files.forEach(file => /\.js$/.test(file) ? scriptFiles.push(file) : assetFiles.push(file))
+
     this.addAssetsEntry(context, assetFiles)
     this.addScriptEntry(context, scriptFiles)
-  }
-
-  addListenFiles (files) {
-    /**
-     * 添加所有已经监听的文件
-     */
-    files.forEach((file) => {
-      if (!this.filesSet.has(file)) this.filesSet.add(file)
-    })
   }
 
   addAssetsEntry (context, entrys) {
@@ -229,82 +159,59 @@ module.exports = class MiniProgam {
     }
   }
 
-  checkEntry (entry) {
-    if (!entry) throw new Error('entry 配置错误，可以是一个字符串和数组')
-
-    const tempEntrys = typeof entry === typeof '' ? [entry] : entry
-
-    if (!Array.isArray(tempEntrys) || tempEntrys.length < 1) throw new Error('entry 配置错误，必须是一个字符串和数组')
-
-    tempEntrys.forEach((entry) => {
-      if (!/\.json/.test(entry)) throw new Error('entry 配置错误，必须是 json 文件路径')
-    })
-  }
-
   async loadEntrys (entry) {
-    this.entrys = entry = typeof entry === typeof '' ? [entry] : entry
-    this.checkEntry(entry)
+    console.log('-=====')
     let index = 0
+    let componentFiles = {}
 
-    this.entryContexts = []
     this.entryNames = []
 
-    let promiseSet = new Set()
-
-    for (const item of entry) {
-      const entryPath = isAbsolute(item) ? item : join(context, item)
-
-      this.checkEntry(entryPath)
-
+    for (const entryPath of entry) {
       const itemContext = dirname(entryPath)
       const fileName = basename(entryPath, '.json')
 
-      this.entryContexts.push(itemContext)
       this.entryNames.push(fileName)
 
       /**
        * 主入口
        */
       if (index === 0) {
-        this.mainEntry = item
+        this.mainEntry = entryPath
         this.mainContext = itemContext
         this.mainName = fileName
         index++
       }
 
       /**
-       * 获取配置信息，并设置
+       * 获取配置信息，并设置，因为设置分包引用提取，需要先设置好
        */
-      const config = require(item)
-      this.setAppJson(config, item)
+      const config = require(entryPath)
+      setAppJson(config, entryPath, entryPath === this.mainEntry)
 
       /**
        * 添加页面
        */
-      let pageFiles = this.getPagesEntry(config, itemContext)
-
-      let componentSet = new Set()
-
-      pageFiles.push(entryPath)
-
-      promiseSet.add(
-        this.loadComponentsFiles(pageFiles, componentSet)
-          .then(() => {
-            let files = flattenDeep(Array.from(componentSet))
-            this.addEntrys(itemContext, files)
-          })
-      )
-
-      this.addEntrys(itemContext, pageFiles)
+      let pageFiles = reslovePagesFiles(config, itemContext)
 
       /**
        * 入口文件只打包对应的 wxss 文件
        */
       let entryFiles = getFiles(itemContext, fileName, ['.wxss'])
-      this.addEntrys(itemContext, entryFiles)
+
+      /**
+       * 添加所有与这个 json 文件相关的 page 文件和 app 文件到编译中
+       */
+      this.addEntrys(itemContext, [pageFiles, entryFiles, entryPath])
+
+      this.fileTree.setFile(entryFiles)
+      this.fileTree.addEntry(entryPath)
+
+      pageFiles.push(entryPath)
+
+      componentFiles[itemContext] = pageFiles.filter((file) => this.fileTree.getFile(file).isJson)
     }
 
-    let tabBar = this.appJsonCode.tabBar
+    let tabBar = getAppJson().tabBar
     let extfile = this.options.extfile
 
     let entrys = [
@@ -314,77 +221,27 @@ module.exports = class MiniProgam {
     ]
 
     // tabBar icons
-    entrys.concat(tabBar && tabBar.list && this.getTabBarIcons(this.mainContext, tabBar.list) || [])
+    entrys.concat((tabBar && tabBar.list && this.getTabBarIcons(this.mainContext, tabBar.list)) || [])
 
-    this.addEntrys(this.mainContext, flattenDeep(entrys))
-    return await Promise.all(Array.from(promiseSet))
-  }
+    this.fileTree.setFile(
+      flattenDeep(entrys)
+    )
 
-  async loadComponentsFiles (pageFiles, componentSet) {
-    let jsons = pageFiles.filter((file) => /\.json/.test(file))
+    this.addEntrys(this.mainContext, entrys)
 
-    for (const json of jsons) {
-      let files = await componentFiles(this.resolver, json, this.componentSet)
-      files = flattenDeep(files)
-      componentSet.add(files)
-      await this.loadComponentsFiles(flattenDeep(files), componentSet)
-    }
-  }
-  /**
-   * 根据 app.json 配置获取页面文件路径
-   * @param {*} entry
-   */
-  getPagesEntry (config, context) {
-    const pages = this.getNewPages(config, context)
-    const files = pages.map((page) => {
-      const files = this.getPageFiles(page)
+    return Promise.all(
+      Object.keys(componentFiles)
+        .map(context => {
+          let componentSet = new Set()
 
-      return files
-    })
-
-    return flattenDeep(files)
-  }
-
-  getPageFiles (page) {
-    let files = getFiles(page)
-    if (files.length < 2) {
-      console.log('⚠️ ', `页面 ${page} 目录必要文件不全`.yellow, '\n')
-      return []
-    }
-
-    // 只有必要文件齐全的文件才会添加到集合
-    files.length >= 2 && this.pagesSet.add(page)
-
-    return files
-  }
-
-  getNewPages ({ pages = [], subPackages = [] }, context) {
-    const _newPages = []
-    const isNewPage = (page) => {
-      if (!this.pagesSet.has(page)) {
-        return true
-      }
-      return false
-    }
-
-    subPackages.forEach(({ root, pages }) => {
-      let _pages = []
-
-      pages.map((page) => {
-        _pages.push(join(root, page))
-        page = join(context, root, page)
-        isNewPage(page) && _newPages.push(page)
-      })
-
-      this.subpackageMap.set(root, _pages)
-    })
-
-    pages.forEach((page) => {
-      page = join(context, page)
-      isNewPage(page) && _newPages.push(page)
-    })
-
-    return _newPages
+          return resolveComponentsFiles(
+            this.resolver,
+            componentFiles[context],
+            componentSet
+          )
+            .then(() => this.addEntrys(context, Array.from(componentSet)))
+        })
+    )
   }
 
   /**
@@ -410,7 +267,7 @@ module.exports = class MiniProgam {
     if (!/\.js$/.test(module.resource) || module.isEntryModule()) return false
     if (!module._usedModules) throw new Error('非插件提供的 module，不能调用这个方法')
 
-    let { subPackages } = this.getAppJson()
+    let { subPackages } = getAppJson()
     let subRoots = subPackages.map(({ root }) => root) || []
     let subReg = new RegExp(subRoots.join('|'))
     let usedFiles = Array.from(module._usedModules)
@@ -446,7 +303,7 @@ module.exports = class MiniProgam {
    * @param {String} path 任意路径
    */
   pathInSubpackage (path) {
-    let { subPackages } = this.getAppJson()
+    let { subPackages } = getAppJson()
 
     for (const { root } of subPackages) {
       let match = path.match(root)
@@ -502,7 +359,7 @@ module.exports = class MiniProgam {
    * @param {String} path
    */
   getPathRoot (path) {
-    let { subPackages } = this.getAppJson()
+    let { subPackages } = getAppJson()
 
     for (const { root } of subPackages) {
       let match = path.match(root)
@@ -522,49 +379,5 @@ module.exports = class MiniProgam {
    */
   otherPackageFiles (root, files) {
     return files.filter(file => file.indexOf(root) === -1)
-  }
-
-  /**
-   * loader 中传递被修改的 app.json
-   */
-  appJsonChange (config, appPath) {
-    this.setAppJson(config, appPath)
-
-    let newPages = this.getNewPages(config, dirname(appPath))
-    let pageFiles = newPages.map(this.getPageFiles.bind(this))
-
-    pageFiles = flattenDeep(pageFiles).filter(file => !this.filesSet.has(file))
-    this._appending = this._appending.concat(pageFiles)
-  }
-
-  addWxmlDeps (resourcePath, deps) {
-    if (this.xmlDepsMap.has(resourcePath)) {
-      let target = this.xmlDepsMap.get(resourcePath)
-      let children = target.deps
-
-      deps.forEach(path => {
-        if (this.xmlDepsMap.has(path) && target.isLoaded) {
-          children.set(path, this.xmlDepsMap.get(path))
-          return
-        }
-
-        let pathQuery = {
-          deps: new Map()
-        }
-
-        if (this.xmlDepsMap.has(path)) {
-          pathQuery = this.xmlDepsMap.get(path)
-        }
-
-        children.set(path, pathQuery)
-        this.xmlDepsMap.set(path, pathQuery)
-      })
-
-      target.isLoaded = true
-
-      return
-    }
-
-    throw new Error('unbeliveable')
   }
 }

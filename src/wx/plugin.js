@@ -1,6 +1,7 @@
 const {
   ConcatSource
 } = require('webpack-sources')
+const { get: getAppJson } = require('../helpers/app')
 
 module.exports = class WxPluginHelper {
   constructor (miniPlugin) {
@@ -12,14 +13,14 @@ module.exports = class WxPluginHelper {
   }
 
   getAppJsonCode () {
-    return new ConcatSource(JSON.stringify(this.$plugin.getAppJson(), null, 2))
+    return new ConcatSource(JSON.stringify(getAppJson(), null, 2))
   }
 
   getAppJsCode (content) {
     return content
   }
 
-  emitHook(compilation, callback) {
+  emitHook (compilation, callback) {
     callback()
   }
 }
