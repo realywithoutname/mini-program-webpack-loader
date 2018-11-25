@@ -30,7 +30,7 @@ module.exports = class AliPluginHelper {
 
   setCompilation (compilation) {
     const header = '/******/ const _afAppx = __webpack_require__(/*! @alipay/af-appx */ "@alipay/af-appx");\n'
-    const global = '/******/ var global = my.global = my.global || {};\n'
+    const global = '/******/ var global = _afAppx.bridge.global = _afAppx.bridge.global || {};\n'
 
     compilation.hooks.optimizeChunkAssets.tapAsync('MiniPlugin', (chunks, callback) => {
       chunks.forEach(chunk => {

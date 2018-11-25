@@ -22,6 +22,13 @@ Object.assign(
       options.fail = function (error) {
         fail(error)
       }
+
+      options.data = JSON.stringify(options.data)
+
+      options.headers = options.header || {}
+      // options.headers = {
+      //   'Content-Type': options.header['content-type'] || 'application/x-www-form-urlencoded'
+      // }
       origin.httpRequest(options)
     },
     // setStorage(key, data) {
@@ -58,6 +65,20 @@ Object.assign(
       // return origin.setNavigationBar({
       //   title
       // })
+    },
+    /**
+     * TODO
+     */
+    createIntersectionObserver () {},
+    createSelectorQuery () {
+      /**
+       * 先乱起八糟写吧
+       */
+      let query = origin.createSelectorQuery()
+      query.in = (params) => {
+        return query
+      }
+      return query
     }
   }
 )
