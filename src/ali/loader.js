@@ -29,7 +29,7 @@ module.exports = class AliLoaderHelper {
       /**
        * 自定义组件事件不冒泡
        */
-      content = `<view class="{{ rootClass }}" onTap="$_tap">
+      content = `<view class="{{ rootClass }}" id="{{ id }}" onTap="$_tap">
         ${content}
       </view>`
     }

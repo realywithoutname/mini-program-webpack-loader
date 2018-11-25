@@ -86,7 +86,17 @@ function formatComponent (file, buff) {
          */
         if (name && attribs.class && componnets.indexOf(name) !== -1) {
           attribs['root-class'] = attribs.class
+
           delete attribs.class
+        }
+
+        /**
+         * 自定义组件 ID 选择
+         */
+        if (name && attribs.id && componnets.indexOf(name) !== -1) {
+          if (attribs.id) {
+            attribs['onComponentMounted'] = 'componentMounted'
+          }
         }
 
         /**

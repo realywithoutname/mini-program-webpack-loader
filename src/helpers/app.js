@@ -82,5 +82,7 @@ module.exports.get = function () {
     subPackages.push(pack)
   })
 
+  delete code.usingComponents
+
   return code
 }

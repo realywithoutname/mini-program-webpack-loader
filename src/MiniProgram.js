@@ -75,6 +75,10 @@ module.exports = class MiniProgam {
     utils.setDistParams(this.compilerContext, this.miniEntrys, this.options.resources, this.outputPath)
   }
 
+  getGlobalComponents () {
+    return this.appJsonCode.usingComponents || {}
+  }
+
   getExtJson () {
     if (!existsSync(this.options.extfile)) {
       console.warn(`${this.options.extfile} 文件找不到`)
