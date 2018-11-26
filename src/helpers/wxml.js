@@ -1,0 +1,188 @@
+const { DomUtils, parseDOM } = require('htmlparser2')
+const { ConcatSource } = require('webpack-sources')
+const FileTree = require('../FileTree')
+const utils = require('../utils')
+
+let tree = new FileTree()
+const wxNativeTags = ['view', 'scroll-view', 'swiper', 'movable-view', 'movable-aera', 'cover-view', 'cover-image', 'icon', 'text', 'rich-text', 'progress', 'button', 'checkbox', 'checkbox-group', 'form', 'input', 'label', 'picker', 'picker-view', 'picker-view-column', 'swiper-item', 'radio', 'slider', 'switch', 'textarea', 'navigator', 'functional-page-navigator', 'audio', 'image', 'video', 'camera', 'live-player', 'live-pusher', 'map', 'canvas', 'open-data', 'web-view', 'ad', 'official-account', 'template', 'wxs', 'import', 'include', 'block', 'slot']
+
+module.exports = class Xml {
+  constructor (compilation, request, handle, platform) {
+    this.handle = handle
+    this.request = request
+    this.platform = platform
+    this.compilation = compilation
+    this.getDistPath = platform === 'ali'
+      ? (src) => utils.getDistPath(src).replace(/\.wxml$/, '.axml')
+      : utils.getDistPath
+
+    const buff = this.loadContent(request)
+
+    this._content = this.formatComponent(buff, handle)
+  }
+
+  get content () {
+    return this._content
+  }
+
+  find (content, callback) {
+    let dom = parseDOM(content, {
+      recognizeSelfClosing: true,
+      lowerCaseAttributeNames: false
+    })
+    DomUtils.find(callback, dom, true)
+    return dom
+  }
+
+  loadContent (entry) {
+    let { deps: depSet } = tree.getFile(entry)
+    let content = this.getAssetContent(entry)
+    let buff = new ConcatSource()
+
+    for (let { source } of depSet) {
+      if (this.platform === 'ali' && /\.wxs$/.test(source)) {
+        source = source.replace(/\.wxs$/, '.sjs')
+
+        let originPath = './' + utils.relative(entry, source)
+        let newPath = './' + utils.relative(entry, source)
+
+        content = content.replaceAll(originPath, newPath)
+        console.log('-----------', this.platform === 'ali' && /\.wxs$/.test(source), this.platform === 'ali', /\.wxs$/.test(source))
+        continue
+      }
+
+      let depContent = this.loadContent(source)
+
+      buff.add(depContent)
+    }
+
+    buff.add(content)
+
+    return buff
+  }
+
+  getAssetContent (file) {
+    let distPath = this.getDistPath(file)
+    let { assets, cache } = this.compilation
+
+    if (assets[distPath]) return assets[distPath].source().toString()
+
+    for (const key in cache) {
+      if (cache.hasOwnProperty(key)) {
+        const module = cache[key]
+        if (!module.buildInfo) {
+          debugger
+        }
+        if (module.buildInfo && module.buildInfo.assets) {
+          for (const assetName of Object.keys(module.buildInfo.assets)) {
+            if (module.resource === file) {
+              return module.buildInfo.assets[assetName].source().toString()
+            }
+          }
+        }
+      }
+    }
+
+    throw new Error('执行到这里应该是不对的')
+  }
+
+  /**
+   * 获取一个页面或者组件所有可以使用的自定义组件列表
+   * @param {*} request
+   */
+  getCanUseComponents () {
+    if (this._usingComponents) return this._usingComponents
+
+    let request = this.request.replace('.wxml', '.json')
+    let usingComponents = new Map()
+    let components = null
+    try {
+      let fileMeta = tree.getFile(request)
+      components = fileMeta.components
+    } catch (e) {
+      return usingComponents
+    }
+
+    const merge = (components) => {
+      for (const [tag, path] of components) {
+        !usingComponents.has(tag) && usingComponents.set(
+          tag,
+          utils.relative(
+            utils.getDistPath(request),
+            utils.getDistPath(path)
+          ).replace('.json', '')
+        )
+      }
+    }
+
+    merge(components)
+
+    for (const entry of tree.entry) {
+      let { components } = tree.getFile(entry)
+
+      merge(components)
+    }
+
+    this._usingComponents = usingComponents
+
+    return usingComponents
+  }
+
+  hasUsingComponent (tag) {
+    return wxNativeTags.indexOf(tag) === -1
+  }
+
+  writeToComponent (tags) {
+    let request = this.request.replace('.wxml', '.json')
+    const compoennts = this.getCanUseComponents()
+    const undfnTags = []
+    const jsonCode = JSON.parse(this.getAssetContent(request))
+
+    const usingComponents = jsonCode.usingComponents = jsonCode.usingComponents || {}
+
+    let hasChange = false
+
+    for (const tag of new Set(tags)) {
+      if (!compoennts.has(tag)) {
+        undfnTags.push(tag)
+        continue
+      }
+
+      if (!usingComponents[tag]) {
+        usingComponents[tag] = compoennts.get(tag)
+        hasChange = true
+      }
+    }
+
+    if (hasChange) {
+      let dist = utils.getDistPath(request)
+
+      this.compilation.assets[dist] = new ConcatSource(
+        JSON.stringify(jsonCode, null, 2)
+      )
+    }
+
+    undfnTags.length && console.log('\n', this.getDistPath(this.request), '中使用了未定义的自定义组件:', Array.from(new Set(undfnTags)).toString().yellow)
+  }
+
+  formatComponent (buff, handle) {
+    let content = buff.source().toString()
+    let tags = []
+
+    const componnets = this.getCanUseComponents()
+
+    const dom = this.find(content, ({ name, attribs }) => {
+      if (name && this.hasUsingComponent(name)) {
+        tags.push(name)
+      }
+
+      handle && handle({ name, attribs, inComponents: componnets.has(name) })
+    })
+
+    content = DomUtils.getInnerHTML({ children: dom })
+
+    tags.length && this.writeToComponent(tags)
+
+    return new ConcatSource(content)
+  }
+}

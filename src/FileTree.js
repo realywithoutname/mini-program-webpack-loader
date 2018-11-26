@@ -36,6 +36,7 @@ class FileTree {
     if (FileTree._tree) return FileTree._tree
 
     this.tree = new Map()
+    this.tree.set('entry', new Set())
     this.tree.set('pages', new Map())
     this.tree.set('files', new Map())
     this.tree.set('components', new Map())
@@ -44,15 +45,29 @@ class FileTree {
   }
 
   get size () {
-    return this.tree.get('files').size
+    return this.files.size
+  }
+
+  /**
+   * 普通文件结构
+   * Map {
+   *  path: {
+   *    source: FilePath,
+   *    deps: FileSet,
+   *    [FILE TYPE]: true
+   *  }
+   * }
+   */
+  get files () {
+    return this.tree.get('files')
   }
 
   get pageSize () {
-    return this.tree.get('pages').size
+    return this.pages.size
   }
 
   get subPageSize () {
-    let pageMap = this.tree.get('pages')
+    let pageMap = this.pages
     let size = 0
 
     for (const page of pageMap.values()) {
@@ -64,14 +79,6 @@ class FileTree {
     return size
   }
 
-  get comSize () {
-    return this.tree.get('components').size
-  }
-
-  addEntry (entry) {
-    this.tree.set(entry, this.setFile([entry]))
-  }
-
   /**
    * pages Map {
    *  page: {
@@ -79,12 +86,46 @@ class FileTree {
    *    files: FileSet
    *  }
    * }
+   */
+  get pages () {
+    return this.tree.get('pages')
+  }
+
+  get comSize () {
+    return this.components.size
+  }
+
+  /**
+   * path: {
+   *  source: FilePath,
+   *  isJson: true,
+   *  components: Map {tag: FilePath },
+   *  files: FileSet, // 有完整的链
+   *  used: Set { FilePath } // 该文件被其他哪些文件引用
+   * }
+   */
+  get components () {
+    return this.tree.get('components')
+  }
+
+  get entry () {
+    return this.tree.get('entry')
+  }
+
+  addEntry (entry) {
+    if (!this.entry.has(entry)) {
+      this.tree.set(entry, this.setFile([entry]))
+      this.entry.add(entry)
+    }
+  }
+
+  /**
    * @param {*} pagePath
    * @param {*} pageFiles
    * @param {*} isSubPkg
    */
   addPage (pagePath, pageFiles, inSubPkg) {
-    let pagesMap = this.tree.get('pages')
+    let pagesMap = this.pages
     let pageFileSet = this.setFile(pageFiles)
 
     pagesMap.set(pagePath, {
@@ -95,13 +136,6 @@ class FileTree {
 
   /**
    * json 文件树结构
-   * path: {
-   *  source: FilePath,
-   *  isJson: true,
-   *  components: Map {tag: FilePath },
-   *  files: FileSet, // 有完整的链
-   *  used: Set { FilePath } // 该文件被其他哪些文件引用
-   * }
    * @param {*} file
    * @param {*} tag
    * @param {*} componentPath
@@ -110,17 +144,16 @@ class FileTree {
   addComponent (file, tag, componentPath, componentFiles) {
     let componentFileSet = this.setFile(componentFiles)
 
-    let fileMap = this.tree.get('files')
+    let fileMap = this.files
     let { components } = fileMap.get(file)
 
     components.set(tag, componentPath)
 
-    let componentsMap = this.tree.get('components')
-    let component = componentsMap.get(componentPath)
+    let component = this.components.get(componentPath)
 
     if (!component) {
       component = { files: new Set(), used: new Set() }
-      componentsMap.set(componentPath, component)
+      this.components.set(componentPath, component)
     }
 
     component.files = componentFileSet
@@ -128,32 +161,32 @@ class FileTree {
   }
 
   /**
-   * 普通文件结构
-   * path: {
-   *  source: FilePath,
-   *  deps: FileSet,
-   *  [FILE TYPE]: true
-   * }
    * @param {*} file
    * @param {*} depFiles
    */
   addDeps (file, depFiles) {
-    let fileMap = this.tree.get('files')
+    let fileMap = this.files
     let fileMeta = fileMap.get(file)
 
-    fileMeta.deps = this.setFile(depFiles)
+    const deps = this.setFile(depFiles)
+
+    for (const item of deps) {
+      if (/\.wxml$/.test(item.source)) item.isTemplate = true
+    }
+
+    fileMeta.deps = deps
   }
 
   has (file) {
-    return this.tree.get('files').has(file)
+    return this.files.has(file)
   }
 
   hasPage (page) {
-    return this.tree.get('pages').has(page)
+    return this.pages.has(page)
   }
 
   setFile (files) {
-    let fileMap = this.tree.get('files')
+    let fileMap = this.files
     let fileSet = new Set()
 
     files = Array.isArray(files) ? files : [ files ]
@@ -174,7 +207,7 @@ class FileTree {
   }
 
   getFile (file) {
-    let fileMap = this.tree.get('files')
+    let fileMap = this.files
     let fileMeta = fileMap.get(file)
 
     if (!fileMeta) throw new Error('Can`t find file: ' + file)
@@ -183,7 +216,7 @@ class FileTree {
   }
 
   removeFile (file) {
-    let fileMap = this.tree.get('files')
+    let fileMap = this.files
     let fileMeta = fileMap.get(file)
 
     fileMap.delete(file)
@@ -192,7 +225,7 @@ class FileTree {
   }
 
   clearDepComponents (file) {
-    let fileMap = this.tree.get('files')
+    let fileMap = this.files
     let { components } = fileMap.get(file)
 
     components.clear()

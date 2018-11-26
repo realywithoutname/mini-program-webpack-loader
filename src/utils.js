@@ -124,7 +124,6 @@ exports.setMapValue = (origin, protertyName, value) => {
 exports.formatEntry = (context = process.cwd(), entry = [], chunkNames = []) => {
   let miniEntrys = []
 
-  console.log(entry)
   let getEntry = entry => {
     entry = isAbsolute(entry) ? entry : join(context, entry)
     if (!existsSync(entry)) throw new Error('找不到文件：', entry)

@@ -60,7 +60,7 @@ var mergeComponentBehaviors = function (target) {
 var triggerEvent = {
   methods: {
     triggerEvent: function (eventName, detail, options) {
-      eventName = eventName.replace(/[^a-zA-Z]/, '')
+      eventName = eventName.replace(/[^a-zA-Z]/, '').toLowerCase()
 
       eventName = eventName.substr(0, 1).toUpperCase() + eventName.substr(1)
       /**

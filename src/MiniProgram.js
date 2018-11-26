@@ -164,7 +164,6 @@ module.exports = class MiniProgam {
   }
 
   async loadEntrys (entry) {
-    console.log('-=====')
     let index = 0
     let componentFiles = {}
 
