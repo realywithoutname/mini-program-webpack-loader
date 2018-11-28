@@ -1,13 +1,21 @@
 var _afAppx = __webpack_require__(/*! @alipay/af-appx */ '@alipay/af-appx')
 var global = _afAppx.bridge.MNTG = _afAppx.bridge.global || {}
+function camelCase (str) {
+  let words = str.split(/[^a-zA-Z]/)
 
+  return words.reduce((str, val) => {
+    str += (val[0].toUpperCase() + val.substr(1))
+    return str
+  }, words.shift())
+}
 var mergeComponentBehaviors = function (target) {
   let {
     properties,
     ready,
     attached,
     detached,
-    behaviors = []
+    behaviors = [],
+    exteralClasses
   } = target
   let data = {}
   let props = {}
@@ -51,7 +59,8 @@ var mergeComponentBehaviors = function (target) {
     didUnmount,
     data,
     properties,
-    methods
+    methods,
+    exteralClasses
   }
 }
 /**
@@ -112,6 +121,10 @@ module.exports = global.Component = function (com) {
     return res
   }, {})
 
+  ;(com.exteralClasses || []).forEach(key => {
+    key = camelCase(key)
+    props[key] = String
+  })
   // 可能有组件有 id
   if (props.id !== undefined) delete selectComponentMixin.props['id']
 
@@ -124,7 +137,7 @@ module.exports = global.Component = function (com) {
   com.didMount = function () {
     this._coms = {}
     if (this.props.id) {
-      // setTimeout(() => this.props.onComponentMounted(this.props.id, this), 0)
+      setTimeout(() => this.props.onComponentMounted(this.props.id, this), 0)
     }
     /**
      * 第一次把所有的 props 都传给 data

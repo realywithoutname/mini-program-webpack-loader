@@ -7,8 +7,7 @@ let tree = new FileTree()
 const wxNativeTags = ['view', 'scroll-view', 'swiper', 'movable-view', 'movable-aera', 'cover-view', 'cover-image', 'icon', 'text', 'rich-text', 'progress', 'button', 'checkbox', 'checkbox-group', 'form', 'input', 'label', 'picker', 'picker-view', 'picker-view-column', 'swiper-item', 'radio', 'slider', 'switch', 'textarea', 'navigator', 'functional-page-navigator', 'audio', 'image', 'video', 'camera', 'live-player', 'live-pusher', 'map', 'canvas', 'open-data', 'web-view', 'ad', 'official-account', 'template', 'wxs', 'import', 'include', 'block', 'slot']
 
 module.exports = class Xml {
-  constructor (compilation, request, handle, platform) {
-    this.handle = handle
+  constructor (compilation, request, platform) {
     this.request = request
     this.platform = platform
     this.compilation = compilation
@@ -16,22 +15,65 @@ module.exports = class Xml {
       ? (src) => utils.getDistPath(src).replace(/\.wxml$/, '.axml')
       : utils.getDistPath
 
-    const buff = this.loadContent(request)
-
-    this._content = this.formatComponent(buff, handle)
+    this.buff = this.loadContent(request)
   }
 
   get content () {
     return this._content
   }
 
-  find (content, callback) {
+  static find (content, callback) {
     let dom = parseDOM(content, {
       recognizeSelfClosing: true,
       lowerCaseAttributeNames: false
     })
     DomUtils.find(callback, dom, true)
     return dom
+  }
+
+  /**
+   * 获取一个页面或者组件所有可以使用的自定义组件列表
+   * @param {*} request
+   */
+  static getCanUseComponents (request, useRelative = true) {
+    if (Xml[request] && Xml[request]._usingComponents) return Xml[request]._usingComponents
+
+    request = request.replace('.wxml', '.json')
+
+    let usingComponents = new Map()
+    let components = null
+    try {
+      let fileMeta = tree.getFile(request)
+      components = fileMeta.components
+    } catch (e) {
+      return usingComponents
+    }
+
+    const merge = (components) => {
+      for (const [tag, path] of components) {
+        !usingComponents.has(tag) && usingComponents.set(
+          tag,
+          useRelative ? utils.relative(
+            utils.getDistPath(request),
+            utils.getDistPath(path)
+          ).replace('.json', '') : path
+        )
+      }
+    }
+
+    merge(components)
+
+    for (const entry of tree.entry) {
+      let { components } = tree.getFile(entry)
+
+      merge(components)
+    }
+
+    Xml[request] = {
+      _usingComponents: usingComponents
+    }
+
+    return usingComponents
   }
 
   loadContent (entry, loaded = {}) {
@@ -88,55 +130,13 @@ module.exports = class Xml {
     throw new Error('执行到这里应该是不对的')
   }
 
-  /**
-   * 获取一个页面或者组件所有可以使用的自定义组件列表
-   * @param {*} request
-   */
-  getCanUseComponents () {
-    if (this._usingComponents) return this._usingComponents
-
-    let request = this.request.replace('.wxml', '.json')
-    let usingComponents = new Map()
-    let components = null
-    try {
-      let fileMeta = tree.getFile(request)
-      components = fileMeta.components
-    } catch (e) {
-      return usingComponents
-    }
-
-    const merge = (components) => {
-      for (const [tag, path] of components) {
-        !usingComponents.has(tag) && usingComponents.set(
-          tag,
-          utils.relative(
-            utils.getDistPath(request),
-            utils.getDistPath(path)
-          ).replace('.json', '')
-        )
-      }
-    }
-
-    merge(components)
-
-    for (const entry of tree.entry) {
-      let { components } = tree.getFile(entry)
-
-      merge(components)
-    }
-
-    this._usingComponents = usingComponents
-
-    return usingComponents
-  }
-
   hasUsingComponent (tag) {
     return wxNativeTags.indexOf(tag) === -1
   }
 
   writeToComponent (tags) {
     let request = this.request.replace('.wxml', '.json')
-    const compoennts = this.getCanUseComponents()
+    const compoennts = Xml.getCanUseComponents(this.request)
     const undfnTags = []
     const jsonCode = JSON.parse(this.getAssetContent(request))
 
@@ -172,16 +172,16 @@ module.exports = class Xml {
       )
     }
 
-    undfnTags.length && console.log('\n', this.getDistPath(this.request), '中使用了未定义的自定义组件:', Array.from(new Set(undfnTags)).toString().yellow)
+    // COMMENT undfnTags.length && console.log('\n', this.getDistPath(this.request), '中使用了未定义的自定义组件:', Array.from(new Set(undfnTags)).toString().yellow)
   }
 
-  formatComponent (buff, handle) {
-    let content = buff.source().toString()
+  formatComponent (handle) {
+    let content = this.buff.source().toString()
     let tags = []
 
-    const componnets = this.getCanUseComponents()
+    const componnets = Xml.getCanUseComponents(this.request)
 
-    const dom = this.find(content, ({ name, attribs = {} }) => {
+    const dom = Xml.find(content, ({ name, attribs = {} }) => {
       if (name && this.hasUsingComponent(name)) {
         tags.push(name)
       }

@@ -6,7 +6,7 @@ const set = (target, key, val) => {
 let regRules = {
   '.js$': meta => set(meta, 'isJs', true),
   '.json$': meta => set(meta, 'isJson', true) && set(meta, 'components', new Map()),
-  '.wxml$': meta => set(meta, 'isWxml', true),
+  '.wxml$': meta => set(meta, 'isWxml', true) && set(meta, 'exteralClasses', new Set()),
   '.wxs$': meta => set(meta, 'isWxs', true),
   '.wxss$': meta => set(meta, 'isWxss', true),
   '.scss$': meta => set(meta, 'isScss', true),
