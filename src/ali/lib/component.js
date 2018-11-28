@@ -112,6 +112,9 @@ module.exports = global.Component = function (com) {
     return res
   }, {})
 
+  // 可能有组件有 id
+  if (props.id !== undefined) delete selectComponentMixin.props['id']
+
   com.mixins = [global._mixins, triggerEvent, selectComponentMixin]
 
   com.props = props || {}
@@ -121,7 +124,7 @@ module.exports = global.Component = function (com) {
   com.didMount = function () {
     this._coms = {}
     if (this.props.id) {
-      setTimeout(() => this.props.onComponentMounted(this.props.id, this), 0)
+      // setTimeout(() => this.props.onComponentMounted(this.props.id, this), 0)
     }
     /**
      * 第一次把所有的 props 都传给 data
@@ -142,10 +145,12 @@ module.exports = global.Component = function (com) {
         let fn = observers[prop]
 
         if (typeof observers[prop] === 'string') {
-          fn = this[prop]
+          fn = this[observers[prop]]
         }
 
-        if (typeof fn !== 'function') throw new Error('找不到 observer 对应的方法', prop)
+        if (typeof fn !== 'function') {
+          throw new Error('找不到 observer 对应的方法', prop)
+        }
 
         fn.call(this, prevProps[prop])
       })

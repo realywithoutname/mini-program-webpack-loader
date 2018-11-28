@@ -66,7 +66,11 @@ module.exports = class AliPluginHelper {
 
   getAppJsonCode () {
     const app = getAppJson()
-    const { subPackages, tabBar, pages: originPages } = app
+    const {
+      subPackages,
+      tabBar,
+      pages: originPages
+    } = JSON.parse(JSON.stringify(app))
 
     subPackages.forEach(({ root, pages }) => {
       pages.forEach(page => {

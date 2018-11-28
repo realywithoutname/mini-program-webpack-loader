@@ -1,12 +1,10 @@
-const cheerio = require('cheerio')
-const htmlparser = require('htmlparser2')
-const { join, dirname, basename } = require('path')
+const FileTree = require('../FileTree')
 
+let tree = new FileTree()
 module.exports = class AliLoaderHelper {
-  constructor (loader, plugin) {
-    this.loader = loader
-    this.$plugin = plugin
-    this.baseName = join(dirname(loader.resourcePath), basename(loader.resourcePath, '.wxml'))
+  constructor (file) {
+    this.file = file
+    this.componentPath = file.replace('.wxml', '.json')
   }
 
   transformWxss (content) {
@@ -25,7 +23,7 @@ module.exports = class AliLoaderHelper {
 
     content = content.replace(/<import.+?src=.+?[/>.+?</import]>\n/g, '')
 
-    if (this.$plugin.componentSet.has(this.baseName)) {
+    if (tree.components.has(this.componentPath)) {
       /**
        * 自定义组件事件不冒泡
        */

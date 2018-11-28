@@ -34,12 +34,15 @@ module.exports = class Xml {
     return dom
   }
 
-  loadContent (entry) {
+  loadContent (entry, loaded = {}) {
     let { deps: depSet } = tree.getFile(entry)
     let content = this.getAssetContent(entry)
     let buff = new ConcatSource()
 
     for (let { source } of depSet) {
+      // 依赖的文件已经添加不需要再次添加
+      if (loaded[source]) continue
+
       if (this.platform === 'ali' && /\.wxs$/.test(source)) {
         source = source.replace(/\.wxs$/, '.sjs')
 
@@ -47,13 +50,14 @@ module.exports = class Xml {
         let newPath = './' + utils.relative(entry, source)
 
         content = content.replaceAll(originPath, newPath)
-        console.log('-----------', this.platform === 'ali' && /\.wxs$/.test(source), this.platform === 'ali', /\.wxs$/.test(source))
         continue
       }
 
       let depContent = this.loadContent(source)
 
       buff.add(depContent)
+
+      loaded[source] = true
     }
 
     buff.add(content)
@@ -70,9 +74,7 @@ module.exports = class Xml {
     for (const key in cache) {
       if (cache.hasOwnProperty(key)) {
         const module = cache[key]
-        if (!module.buildInfo) {
-          debugger
-        }
+
         if (module.buildInfo && module.buildInfo.assets) {
           for (const assetName of Object.keys(module.buildInfo.assets)) {
             if (module.resource === file) {
@@ -139,12 +141,20 @@ module.exports = class Xml {
     const jsonCode = JSON.parse(this.getAssetContent(request))
 
     const usingComponents = jsonCode.usingComponents = jsonCode.usingComponents || {}
+    const genericComponents = Object.keys(jsonCode.componentGenerics || {})
 
     let hasChange = false
 
     for (const tag of new Set(tags)) {
       if (!compoennts.has(tag)) {
         undfnTags.push(tag)
+        continue
+      }
+
+      /**
+       * 抽象组件不处理
+       */
+      if (genericComponents.indexOf(tag) !== -1) {
         continue
       }
 
@@ -171,9 +181,21 @@ module.exports = class Xml {
 
     const componnets = this.getCanUseComponents()
 
-    const dom = this.find(content, ({ name, attribs }) => {
+    const dom = this.find(content, ({ name, attribs = {} }) => {
       if (name && this.hasUsingComponent(name)) {
         tags.push(name)
+      }
+
+      let attrKeys = Object.keys(attribs)
+
+      /**
+       * 抽象组件处理
+       * 如果作死有这个鬼那就ooo了
+       */
+      if (/generic:/.test(attrKeys.join(';'))) {
+        attrKeys.forEach(key => {
+          /generic:/.test(key) && tags.push(attribs[key])
+        })
       }
 
       handle && handle({ name, attribs, inComponents: componnets.has(name) })

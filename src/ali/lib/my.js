@@ -57,6 +57,7 @@ Object.assign(
 
     showTabBar () {},
 
+    showModal () {},
     startPullDownRefresh () {
 
     },

@@ -57,10 +57,7 @@ function componentHandle ({
 }
 
 module.exports = async function (compilation, plugin) {
-  let wxmls = [
-    ...tree.pages.values(),
-    ...tree.components.values()
-  ].filter(fileMeta => fileMeta.isWxml)
+  let wxmls = tree.wxmls
 
   for (const file of wxmls) {
     let xml = new Xml(compilation, file, componentHandle, 'ali')

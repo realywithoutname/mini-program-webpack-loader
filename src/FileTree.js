@@ -230,6 +230,24 @@ class FileTree {
 
     components.clear()
   }
+
+  get wxmls () {
+    let wxmls = []
+
+    for (const { files } of this.pages.values()) {
+      for (const fileMeta of files) {
+        fileMeta.isWxml && wxmls.push(fileMeta.source)
+      }
+    }
+
+    for (const { files } of this.components.values()) {
+      for (const fileMeta of files) {
+        fileMeta.isWxml && wxmls.push(fileMeta.source)
+      }
+    }
+
+    return wxmls
+  }
 }
 
 module.exports = FileTree

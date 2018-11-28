@@ -24,8 +24,8 @@ class MiniLoader {
     this.fileMeta = tree.getFile(loader.resourcePath)
 
     this.targetHelper = this.$plugin.options.target === 'ali'
-      ? new AliLoaderHelper(this, this.$plugin)
-      : new WXLoaderHelper(this)
+      ? new AliLoaderHelper(loader.resourcePath, this.$plugin)
+      : new WXLoaderHelper(loader.resourcePath)
 
     this.resolve = (context, request) => new Promise((resolve, reject) => {
       loader.resolve(context, request, (err, result) => err ? reject(err) : resolve(result))
