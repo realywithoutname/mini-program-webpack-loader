@@ -8,12 +8,38 @@ function camelCase (str) {
     return str
   }, words.shift())
 }
+function resolvePropsAndObservers (properties = {}, exteralClasses = []) {
+  let props = {}
+  let observers = Object.keys(properties).reduce((res, key) => {
+    const prop = properties[key] || {}
+    if (prop !== null && typeof prop === 'object' && prop.observer) {
+      res[key] = prop.observer
+    }
+
+    props[key] = [Array, String, Boolean, Object, Number].indexOf(prop) === -1
+      ? prop.value || null // 定义了一个对象的处理默认值: { a: { type: Number } }
+      : prop === Array // 只是定义了类型的处理默认值: { a: Number }
+        ? []
+        : prop('') // 其他类型直接用对应的构造函数处理为对应的值
+
+    return res
+  }, {})
+
+  // exteralClasses 全部处理为 prop
+  ;(exteralClasses || []).forEach(key => {
+    key = camelCase(key)
+    props[key] = '' // 默认值为空
+  })
+  return { props, observers }
+}
 var mergeComponentBehaviors = function (target) {
   let {
     properties,
     ready,
+    created,
     attached,
     detached,
+    didUpdate,
     behaviors = [],
     exteralClasses
   } = target
@@ -21,7 +47,9 @@ var mergeComponentBehaviors = function (target) {
   let props = {}
   let methods = {}
   let readys = []
+  let createds = []
   let attacheds = []
+  let didUpdates = []
   let didUnmounts = detached ? [detached] : []
 
   behaviors.forEach(behavior => {
@@ -33,17 +61,25 @@ var mergeComponentBehaviors = function (target) {
     Object.assign(methods, behavior.methods)
 
     behavior.ready && readys.push(behavior.ready)
+    behavior.created && createds.push(behavior.created)
     behavior.attached && attacheds.push(behavior.attached)
-
+    behavior.didUpdate && didUpdates.push(behavior.didUpdate)
     behavior.didUnmount && didUnmounts.push(behavior.detached)
   })
 
   ready && readys.push(ready)
+  created && createds.push(created)
   attached && attacheds.push(attached)
+  didUpdate && didUpdates.push(didUpdate)
 
   const $_didMount = function () {
+    createds.forEach(created => created.call(this))
     attacheds.forEach(attached => attached.call(this))
     readys.forEach(ready => ready.call(this))
+  }
+
+  const $_didUpdate = function (prevProps, prevData) {
+    didUpdates.forEach(didUpdate => didUpdate.call(this, prevProps, prevData))
   }
 
   const didUnmount = function () {
@@ -52,7 +88,7 @@ var mergeComponentBehaviors = function (target) {
 
   data = Object.assign({}, data, target.data)
   properties = Object.assign({}, props, properties)
-  methods = Object.assign({}, methods, target.methods)
+  methods = Object.assign({}, methods, target.methods, { $_didUpdate })
 
   return {
     $_didMount,
@@ -67,6 +103,9 @@ var mergeComponentBehaviors = function (target) {
  * 支持自定义组件的 triggerEvent 方法
  */
 var triggerEvent = {
+  props: {
+    parentData: Object // 组件数据
+  },
   methods: {
     triggerEvent: function (eventName, detail, options) {
       eventName = eventName.replace(/[^a-zA-Z]/, '').toLowerCase()
@@ -86,88 +125,116 @@ var triggerEvent = {
     $_tap: function (e) {
       this.props.onTap && this.props.onTap(e)
     },
-    $_merge: function (isDataUpdate) {
-      this.data = this.properties = this.props = isDataUpdate ? Object.assign(this.props, this.data) : Object.assign(this.data, this.props)
+    $_merge: function (prevProps, prevData) {
+      let propsIsUpdate = prevData === this.data
+      if (propsIsUpdate) {
+        let observers = this.$_observers
+        let props = Object.keys(this.props)
+
+        let fns = []
+        props.forEach((prop) => {
+          if ((prevProps && prevProps[prop] === this.props[prop])) return
+
+          this.data[prop] = this.props[prop]
+
+          if (!observers[prop]) return
+
+          let fn = observers[prop]
+
+          if (typeof observers[prop] === 'string') {
+            fn = this[observers[prop]]
+          }
+
+          if (typeof fn !== 'function') {
+            throw new Error('找不到 observer 对应的方法', prop)
+          }
+
+          fns.push(() => fn.call(this, this.props[prop], prevProps ? prevProps[prop] : undefined))
+        })
+
+        fns.forEach(fn => fn())
+      }
     }
   }
 }
 
-var selectComponentMixin = {
-  props: {
-    id: ''
-  },
-  methods: {
-    componentMounted (id, com) {
-      if (this._coms[id]) throw new Error('组件内已经存在 id 为' + id + '的组件')
-      this._coms[`#${id}`] = com
+function resloveComponentNodesMixin (relations) {
+  var selectComponentMixin = {
+    props: {
+      id: '',
+      onComponentMounted () {}
     },
-    selectComponent (id) {
-      return this._coms[id]
+
+    didMount () {
+      this.id = this.props.id
+      this._relations = relations
+      setTimeout(() => this.props.onComponentMounted(this), 0)
+    },
+    methods: {
+      componentMounted (com) {
+        this._coms = this._coms || []
+        this._coms.push(com)
+
+        let comKeys = Object.keys(com._relations)
+
+        comKeys.forEach(key => {
+          let {
+            type,
+            linked,
+            unlinked
+          } = relations[key]
+
+          if (type === 'parent') {
+
+          }
+        })
+      },
+      selectComponent (id) {
+        return this._coms.filter(com => `#${com.id}` === id)
+      },
+      getRelationNodes (selector) {
+
+      }
     }
   }
+
+  return selectComponentMixin
 }
 module.exports = global.Component = function (com) {
-  com = mergeComponentBehaviors(com)
-
-  const props = {}
   const Component = (_afAppx.WorkerComponent || function () {})
-  const observers = Object.keys(com.properties || {}).reduce((res, key) => {
-    const prop = com.properties[key] || {}
-    if (prop !== null && typeof prop === 'object' && prop.observer) {
-      res[key] = prop.observer
-    }
+  let {
+    relations,
+    exteralClasses
+  } = com
 
-    props[key] = [Array, String, Boolean, Object, Number].indexOf(prop) === -1 ? prop.value || null : prop === Array ? [] : prop('')
-    return res
-  }, {})
-
-  ;(com.exteralClasses || []).forEach(key => {
-    key = camelCase(key)
-    props[key] = String
-  })
+  // 这里获取到的 com 是一个新对象
+  com = mergeComponentBehaviors(com)
+  const {
+    props,
+    observers
+  } = resolvePropsAndObservers(com.properties, exteralClasses)
+  const componentNodesMixin = resloveComponentNodesMixin(relations)
   // 可能有组件有 id
-  if (props.id !== undefined) delete selectComponentMixin.props['id']
+  if (props.id !== undefined) delete componentNodesMixin.props['id']
 
-  com.mixins = [global._mixins, triggerEvent, selectComponentMixin]
+  com.mixins = [global._mixins, triggerEvent, componentNodesMixin]
 
   com.props = props || {}
 
   com.props.rootClass = String
 
   com.didMount = function () {
-    this._coms = {}
-    if (this.props.id) {
-      setTimeout(() => this.props.onComponentMounted(this.props.id, this), 0)
-    }
     /**
      * 第一次把所有的 props 都传给 data
      */
     this.$_observers = observers
     this.$_merge(null, this.data)
     com.$_didMount.call(this)
+    this.$_didUpdate(this.props, this.data)
   }
   com.didUpdate = function (prevProps, prevData) {
-    // console.log(prevProps === this.props, prevData === this.data)
-    // console.log(this.props.list, prevData === this.data)
-    this.$_merge(prevData === this.data)
-    if (prevData !== this.data) {
-      let props = Object.keys(prevProps)
-      props.forEach((prop) => {
-        if (!observers[prop]) return
-
-        let fn = observers[prop]
-
-        if (typeof observers[prop] === 'string') {
-          fn = this[observers[prop]]
-        }
-
-        if (typeof fn !== 'function') {
-          throw new Error('找不到 observer 对应的方法', prop)
-        }
-
-        fn.call(this, prevProps[prop])
-      })
-    }
+    this.$_merge(prevProps, prevData)
+    this.$_didUpdate(this, prevProps, prevData)
   }
 
   Component(com)

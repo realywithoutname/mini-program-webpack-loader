@@ -25,6 +25,8 @@ function componentHandle (forEachAttr) {
     if (name && inComponents) {
       let attrs = Object.keys(attribs)
 
+      let data = ''
+
       attrs.forEach(attr => {
         let match = attr.match(/^(on|catch)/)
         if (match) {
@@ -43,8 +45,21 @@ function componentHandle (forEachAttr) {
 
           eventSet.add(event)
         }
+
+        if (/data-/.test(attr)) {
+          let key = utils.camelCase(attr.substr(5))
+          data += key + ': ' + attribs[attr].replace(/[{}\s]/g, '') + ','
+
+          delete attribs[attr]
+        }
+
         forEachAttr(name, attr, attribs[attr])
       })
+
+      if (data.length) {
+        data = data.substr(0, data.length - 1)
+        attribs['parent-data'] = `{{ ${data} }}`
+      }
     }
 
     /**
@@ -56,22 +71,14 @@ function componentHandle (forEachAttr) {
   }
 }
 
-function camelCase (str) {
-  let words = str.split(/[^a-zA-Z]/)
-
-  return words.reduce((str, val) => {
-    str += (val[0].toUpperCase() + val.substr(1))
-    return str
-  }, words.shift())
-}
-
 function transClass (exteralClasses, attribs) {
   const updateClassAttr = (classAttr = '') => {
     let classes = classAttr.split(/\s/).map(c => c.trim())
 
-    classes.forEach((c, index) => {
+    classes.forEach((c) => {
       if (exteralClasses.has(c)) {
-        classes[index] = `{{ ${camelCase(c)} }}`
+        // 不能直接替换，万一在自定义组件内还定义了样式呢
+        classes.push(`{{ ${utils.camelCase(c)} }}`)
       }
     })
     return classes
@@ -100,7 +107,7 @@ function transComClass (exteralClasses, attribs, depComPath) {
     // }
     // 应用的组件有定义这个 exteralcalss 并且用的也是外部传入的 exteralcalss
     if (depExteralClasses.has(key) && exteralClasses.has(attribs[key])) {
-      let attrValue = camelCase(attribs[key])
+      let attrValue = utils.camelCase(attribs[key])
 
       attribs[key] = `{{ ${attrValue} }}`
     }
@@ -144,7 +151,7 @@ module.exports = async function (compilation, plugin) {
     let distPath = utils.getDistPath(file).replace(/\.wxml$/, '.axml')
     let content = assets[distPath].source().toString()
 
-    const dom = Xml.find(content, function ({ name, attribs = {} }) {
+    let dom = Xml.find(content, function ({ name, attribs = {} }) {
       // 处理这个 class 属性上用到的 exteralclass
       ;
       (attribs['class'] || attribs['root-class']) && transClass(exteralClasses, attribs)
@@ -152,6 +159,37 @@ module.exports = async function (compilation, plugin) {
       // 自定义组件处理
       coms.get(name) && transComClass(exteralClasses, attribs, coms.get(name))
     })
+
+    let comPath = file.replace('.wxml', '.json')
+
+    /**
+     * 给自定义组件添加属性
+     * class="{{ rootClass }}" id="{{ id }}" onTap="$_tap" data-attrs="{{ parentData }}"
+     */
+    if (tree.components.has(comPath)) {
+      let firstTag = dom[0]
+
+      if (dom.length === 1) {
+        firstTag.class = (firstTag.class || '') + '{{ rootClass }}'
+        firstTag.id = '{{ id }}'
+        firstTag.onTab = firstTag.onTab || '$_tap'
+        firstTag['data-attrs'] = '{{ parentData }}'
+      }
+
+      if (dom.length > 1) {
+        dom = [{
+          type: 'tag',
+          name: 'view',
+          attribs: {
+            class: '{{ rootClass }}',
+            id: '{{ id }}',
+            onTap: '$_tap',
+            'data-attrs': '{{ parentData }}'
+          },
+          children: dom
+        }]
+      }
+    }
 
     content = DomUtils.getInnerHTML({
       children: dom

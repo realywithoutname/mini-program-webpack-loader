@@ -26,6 +26,15 @@ exports.setDistParams = function (context, entryContexts = [], resources = [], o
   compilerContext = context
 }
 
+exports.camelCase = (str) => {
+  let words = str.split(/[^a-zA-Z]/)
+
+  return words.reduce((str, val) => {
+    str += (val[0].toUpperCase() + val.substr(1))
+    return str
+  }, words.shift())
+}
+
 exports.getDistPath = function (path) {
   let fullPath = compilerContext
   let npmReg = /node_modules/g
@@ -127,21 +136,21 @@ exports.formatEntry = (context = process.cwd(), entry = [], chunkNames = []) => 
   let getEntry = entry => {
     entry = isAbsolute(entry) ? entry : join(context, entry)
     if (!existsSync(entry)) throw new Error('找不到文件：', entry)
-  }
 
-  if (typeof entry === 'object' && entry !== null) {
-    Object.keys(entry).forEach((key) => {
-      if (/\.json/.test(entry[key])) {
-        chunkNames.push(key)
-        miniEntrys.push(getEntry(entry[key]))
-      }
-    })
+    return entry
   }
 
   if (Array.isArray(entry)) {
     entry.forEach(item => {
       if (/\.json/.test(item)) {
         miniEntrys.push(getEntry(item))
+      }
+    })
+  } else if (typeof entry === 'object' && entry !== null) {
+    Object.keys(entry).forEach((key) => {
+      if (/\.json/.test(entry[key])) {
+        chunkNames.push(key)
+        miniEntrys.push(getEntry(entry[key]))
       }
     })
   }

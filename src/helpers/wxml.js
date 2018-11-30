@@ -127,7 +127,11 @@ module.exports = class Xml {
       }
     }
 
-    throw new Error('执行到这里应该是不对的')
+    this.compilation.errors.push(
+      new Error(`查找文件 ${file.yellow} 对应的内容时出现错误，请查找与该文件相关的错误信息`)
+    )
+
+    return new ConcatSource()
   }
 
   hasUsingComponent (tag) {

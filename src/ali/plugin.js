@@ -14,7 +14,7 @@ module.exports = class AliPluginHelper {
     new webpack.DefinePlugin({
       wx: 'my',
       App: '_afAppx.App',
-      Page: '_afAppx.Page',
+      Page: 'global.Page',
       getApp: `
       (function () {
         const app = _afAppx.getApp() || {}
@@ -105,6 +105,9 @@ module.exports = class AliPluginHelper {
       `require('./mixin.js');\n`,
       `require('${
         path.relative(this.$plugin.outputPath, path.resolve(__dirname, './lib/component.js'))
+      }');\n`,
+      `require('${
+        path.relative(this.$plugin.outputPath, path.resolve(__dirname, './lib/page.js'))
       }');\n`,
       content
     )

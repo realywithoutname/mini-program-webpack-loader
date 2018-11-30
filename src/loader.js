@@ -162,8 +162,10 @@ class MiniLoader {
   addDepsModule (request) {
     return new Promise((resolve, reject) => {
       this.loader.loadModule(request, (err, src) => {
+        if (!err) return resolve(src)
         // 如果添加依赖失败，把他从文件树中去除
-        err ? reject(err) && tree.remove(request) : resolve(src)
+        reject(err)
+        tree.remove(request)
       })
     })
   }

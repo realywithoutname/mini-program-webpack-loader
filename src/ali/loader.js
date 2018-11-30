@@ -23,14 +23,14 @@ module.exports = class AliLoaderHelper {
 
     content = content.replace(/<import.+?src=.+?[/>.+?</import]>\n/g, '')
 
-    if (tree.components.has(this.componentPath)) {
-      /**
-       * 自定义组件事件不冒泡
-       */
-      content = `<view class="{{ rootClass }}" id="{{ id }}" onTap="$_tap">
-        ${content}
-      </view>`
-    }
+    // if (tree.components.has(this.componentPath)) {
+    //   /**
+    //    * 自定义组件事件不冒泡
+    //    */
+    //   content = `<view class="{{ rootClass }}" id="{{ id }}" onTap="$_tap" data-attrs="{{ parentData }}">
+    //     ${content}
+    //   </view>`
+    // }
 
     return content
   }
