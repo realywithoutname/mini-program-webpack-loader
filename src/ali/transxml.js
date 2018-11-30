@@ -65,7 +65,7 @@ function componentHandle (forEachAttr) {
     /**
      * 自定义组件 ID 选择
      */
-    if (name && attribs.id && inComponents) {
+    if (name && inComponents) {
       attribs['onComponentMounted'] = 'componentMounted'
     }
   }

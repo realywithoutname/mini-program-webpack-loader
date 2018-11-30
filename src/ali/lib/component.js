@@ -72,13 +72,19 @@ var mergeComponentBehaviors = function (target) {
   attached && attacheds.push(attached)
   didUpdate && didUpdates.push(didUpdate)
 
-  const $_didMount = function () {
+  const $didCreate = function () {
     createds.forEach(created => created.call(this))
+  }
+
+  const $didAttach = function () {
     attacheds.forEach(attached => attached.call(this))
+  }
+
+  const $didReady = function () {
     readys.forEach(ready => ready.call(this))
   }
 
-  const $_didUpdate = function (prevProps, prevData) {
+  const $didUpdate = function (prevProps, prevData) {
     didUpdates.forEach(didUpdate => didUpdate.call(this, prevProps, prevData))
   }
 
@@ -88,10 +94,9 @@ var mergeComponentBehaviors = function (target) {
 
   data = Object.assign({}, data, target.data)
   properties = Object.assign({}, props, properties)
-  methods = Object.assign({}, methods, target.methods, { $_didUpdate })
+  methods = Object.assign({}, methods, target.methods, { $didUpdate, $didAttach, $didCreate, $didReady })
 
   return {
-    $_didMount,
     didUnmount,
     data,
     properties,
@@ -125,7 +130,7 @@ var triggerEvent = {
     $_tap: function (e) {
       this.props.onTap && this.props.onTap(e)
     },
-    $_merge: function (prevProps, prevData) {
+    $merge: function (prevProps, prevData) {
       let propsIsUpdate = prevData === this.data
       if (propsIsUpdate) {
         let observers = this.$_observers
@@ -168,32 +173,23 @@ function resloveComponentNodesMixin (relations) {
     didMount () {
       this.id = this.props.id
       this._relations = relations
+      this._rels = {}
+      this._coms = []
+
       setTimeout(() => this.props.onComponentMounted(this), 0)
     },
     methods: {
       componentMounted (com) {
-        this._coms = this._coms || []
-        this._coms.push(com)
 
-        let comKeys = Object.keys(com._relations)
-
-        comKeys.forEach(key => {
-          let {
-            type,
-            linked,
-            unlinked
-          } = relations[key]
-
-          if (type === 'parent') {
-
-          }
-        })
       },
       selectComponent (id) {
         return this._coms.filter(com => `#${com.id}` === id)
       },
       getRelationNodes (selector) {
-
+        return this._rels[selector] || []
+      },
+      getComponent (is) {
+        return this._coms.filter(com => com.is === is)
       }
     }
   }
@@ -228,13 +224,15 @@ module.exports = global.Component = function (com) {
      * 第一次把所有的 props 都传给 data
      */
     this.$_observers = observers
-    this.$_merge(null, this.data)
-    com.$_didMount.call(this)
-    this.$_didUpdate(this.props, this.data)
+    this.$didCreate()
+    this.$merge(null, this.data)
+    this.$didAttach()
+    this.$didReady()
+    this.$didUpdate(this.props, this.data)
   }
   com.didUpdate = function (prevProps, prevData) {
-    this.$_merge(prevProps, prevData)
-    this.$_didUpdate(this, prevProps, prevData)
+    this.$merge(prevProps, prevData)
+    this.$didUpdate(this, prevProps, prevData)
   }
 
   Component(com)

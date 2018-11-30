@@ -7,7 +7,6 @@ module.exports = global.Page = function (page) {
   page.componentMounted = function (com) {
     this._coms = this._coms || []
     this._coms.push(com)
-    console.log(this._coms)
   }
 
   page.selectComponent = function (id) {
