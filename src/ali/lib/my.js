@@ -23,12 +23,13 @@ Object.assign(
         fail(error)
       }
 
-      options.data = JSON.stringify(options.data)
+      // console.log(JSON.stringify(options))
+      if (options.method === 'POST') {
+        options.data = JSON.stringify(options.data)
+      }
 
       options.headers = options.header || {}
-      // options.headers = {
-      //   'Content-Type': options.header['content-type'] || 'application/x-www-form-urlencoded'
-      // }
+
       origin.httpRequest(options)
     },
     // setStorage(key, data) {

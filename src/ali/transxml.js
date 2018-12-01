@@ -48,7 +48,12 @@ function componentHandle (forEachAttr) {
 
         if (/data-/.test(attr)) {
           let key = utils.camelCase(attr.substr(5))
-          data += key + ': ' + attribs[attr].replace(/[{}\s]/g, '') + ','
+          let val = attribs[attr]
+
+          data += key
+          data += ': '
+          data += /[{}\s]/.test(val) ? val.replace(/[{}\s]/g, '') : `'${val}'`
+          data += ','
 
           delete attribs[attr]
         }
@@ -173,7 +178,7 @@ module.exports = async function (compilation, plugin) {
         firstTag.class = (firstTag.class || '') + '{{ rootClass }}'
         firstTag.id = '{{ id }}'
         firstTag.onTab = firstTag.onTab || '$_tap'
-        firstTag['data-attrs'] = '{{ parentData }}'
+        firstTag['data-parent'] = '{{ parentData }}'
       }
 
       if (dom.length > 1) {
@@ -184,7 +189,7 @@ module.exports = async function (compilation, plugin) {
             class: '{{ rootClass }}',
             id: '{{ id }}',
             onTap: '$_tap',
-            'data-attrs': '{{ parentData }}'
+            'data-parent': '{{ parentData }}'
           },
           children: dom
         }]

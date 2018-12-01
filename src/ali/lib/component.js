@@ -1,5 +1,7 @@
 var _afAppx = __webpack_require__(/*! @alipay/af-appx */ '@alipay/af-appx')
 var global = _afAppx.bridge.MNTG = _afAppx.bridge.global || {}
+let { componentEntry } = require('./relation')
+
 function camelCase (str) {
   let words = str.split(/[^a-zA-Z]/)
 
@@ -21,6 +23,8 @@ function resolvePropsAndObservers (properties = {}, exteralClasses = []) {
       : prop === Array // 只是定义了类型的处理默认值: { a: Number }
         ? []
         : prop('') // 其他类型直接用对应的构造函数处理为对应的值
+
+    key == 'plugins' && console.log(prop, key, props[key])
 
     return res
   }, {})
@@ -111,6 +115,10 @@ var triggerEvent = {
   props: {
     parentData: Object // 组件数据
   },
+  didMount () {
+    this.properties = {}
+  },
+
   methods: {
     triggerEvent: function (eventName, detail, options) {
       eventName = eventName.replace(/[^a-zA-Z]/, '').toLowerCase()
@@ -128,6 +136,7 @@ var triggerEvent = {
      * @param {*} e
      */
     $_tap: function (e) {
+      this.props.onTap && console.log(e, this.data.parentData)
       this.props.onTap && this.props.onTap(e)
     },
     $merge: function (prevProps, prevData) {
@@ -141,7 +150,7 @@ var triggerEvent = {
           if ((prevProps && prevProps[prop] === this.props[prop])) return
 
           this.data[prop] = this.props[prop]
-
+          this.properties[prop] = this.props[prop]
           if (!observers[prop]) return
 
           let fn = observers[prop]
@@ -154,6 +163,7 @@ var triggerEvent = {
             throw new Error('找不到 observer 对应的方法', prop)
           }
 
+          /components\/widgets\/classic/.test(this.is) && console.log(this.props[prop], prop)
           fns.push(() => fn.call(this, this.props[prop], prevProps ? prevProps[prop] : undefined))
         })
 
@@ -178,9 +188,14 @@ function resloveComponentNodesMixin (relations) {
 
       setTimeout(() => this.props.onComponentMounted(this), 0)
     },
+
+    didUnmount () {
+      this.$leave && this.$leave()
+    },
+
     methods: {
       componentMounted (com) {
-
+        componentEntry(com, this)
       },
       selectComponent (id) {
         return this._coms.filter(com => `#${com.id}` === id)
@@ -188,7 +203,7 @@ function resloveComponentNodesMixin (relations) {
       getRelationNodes (selector) {
         return this._rels[selector] || []
       },
-      getComponent (is) {
+      getComponents (is) {
         return this._coms.filter(com => com.is === is)
       }
     }
