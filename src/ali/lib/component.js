@@ -24,8 +24,6 @@ function resolvePropsAndObservers (properties = {}, exteralClasses = []) {
         ? []
         : prop('') // 其他类型直接用对应的构造函数处理为对应的值
 
-    key == 'plugins' && console.log(prop, key, props[key])
-
     return res
   }, {})
 
@@ -163,7 +161,6 @@ var triggerEvent = {
             throw new Error('找不到 observer 对应的方法', prop)
           }
 
-          /components\/widgets\/classic/.test(this.is) && console.log(this.props[prop], prop)
           fns.push(() => fn.call(this, this.props[prop], prevProps ? prevProps[prop] : undefined))
         })
 

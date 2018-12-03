@@ -58,6 +58,11 @@ function componentHandle (forEachAttr) {
           delete attribs[attr]
         }
 
+        if (/generic:/.test(attr)) {
+          attribs[attr.replace(/generic:/, '')] = attribs[attr]
+          delete attribs[attr]
+        }
+
         forEachAttr(name, attr, attribs[attr])
       })
 
