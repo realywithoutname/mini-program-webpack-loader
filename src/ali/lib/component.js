@@ -24,8 +24,6 @@ function resolvePropsAndObservers (properties = {}, exteralClasses = []) {
         ? []
         : prop('') // 其他类型直接用对应的构造函数处理为对应的值
 
-    key == 'plugins' && console.log(prop, key, props[key])
-
     return res
   }, {})
 
@@ -68,7 +66,7 @@ var mergeComponentBehaviors = function (target) {
     behavior.created && createds.push(behavior.created)
     behavior.attached && attacheds.push(behavior.attached)
     behavior.didUpdate && didUpdates.push(behavior.didUpdate)
-    behavior.didUnmount && didUnmounts.push(behavior.detached)
+    behavior.detached && didUnmounts.push(behavior.detached)
   })
 
   ready && readys.push(ready)

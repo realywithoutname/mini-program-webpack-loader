@@ -211,7 +211,9 @@ module.exports = class MiniProgam {
 
       pageFiles.push(entryPath)
 
-      componentFiles[itemContext] = pageFiles.filter((file) => this.fileTree.getFile(file).isJson)
+      componentFiles[itemContext] = (componentFiles[itemContext] || []).concat(
+        pageFiles.filter((file) => this.fileTree.getFile(file).isJson)
+      )
     }
 
     let tabBar = getAppJson().tabBar

@@ -98,7 +98,7 @@ class MiniLoader {
      * 怎么速度更快待考证
      */
     let jsFiles = files.filter(file => {
-      let isJS = /\.js/.test(file)
+      let isJS = /\.js$/.test(file)
 
       /**
        * 非 js 文件直接添加到编译处理
@@ -113,7 +113,7 @@ class MiniLoader {
     /**
      * 通知插件，下次编译的时候要把这些 js 文件加到编译中，这些文件必须通过插件添加，因为都是入口文件
      */
-    this.$plugin.newFilesEntryFromLoader(jsFiles)
+    jsFiles.length && this.$plugin.newFilesEntryFromLoader(jsFiles)
 
     return Promise.all(promises)
   }

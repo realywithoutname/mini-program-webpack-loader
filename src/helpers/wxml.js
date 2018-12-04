@@ -131,7 +131,7 @@ module.exports = class Xml {
       new Error(`查找文件 ${file.yellow} 对应的内容时出现错误，请查找与该文件相关的错误信息`)
     )
 
-    return new ConcatSource()
+    return '{}'
   }
 
   hasUsingComponent (tag) {
