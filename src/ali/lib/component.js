@@ -161,7 +161,6 @@ var triggerEvent = {
             throw new Error('找不到 observer 对应的方法', prop)
           }
 
-          /components\/widgets\/classic/.test(this.is) && console.log(this.props[prop], prop)
           fns.push(() => fn.call(this, this.props[prop], prevProps ? prevProps[prop] : undefined))
         })
 
