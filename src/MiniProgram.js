@@ -47,6 +47,8 @@ module.exports = class MiniProgam {
 
     this.fileTree = new FileTree()
 
+    process.env.TARGET = this.options.target || 'wx'
+
     this.helperPlugin = this.options.target === 'ali' ? new AliPluginHelper(this) : new WxPluginHelper(this)
   }
 

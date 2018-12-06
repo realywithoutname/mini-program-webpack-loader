@@ -1,3 +1,6 @@
+const utils = require('./utils')
+const { toTargetPath } = require('./helpers/path')
+
 const set = (target, key, val) => {
   target[key] = val
   return target
@@ -18,7 +21,14 @@ let regRules = {
 function getFileMeta (file) {
   let meta = {
     source: file,
+    dist: toTargetPath(
+      utils.getDistPath(file)
+    ),
     deps: new Set()
+  }
+
+  meta.updateHash = function (hash) {
+    meta.hash = hash
   }
 
   for (const key in regRules) {
@@ -40,6 +50,8 @@ class FileTree {
     this.tree.set('pages', new Map())
     this.tree.set('files', new Map())
     this.tree.set('components', new Map())
+
+    this.outputMap = {}
 
     FileTree._tree = this
   }
@@ -199,6 +211,15 @@ class FileTree {
 
       let meta = getFileMeta(file)
 
+      if (this.outputMap[meta.dist]) {
+        throw new Error(`
+          项目存在不同文件输出到一个文件的情况：
+          ${this.outputMap[meta.dist]} 以及 ${file}
+        `)
+      }
+
+      this.outputMap[meta.dist] = file
+
       fileSet.add(meta)
       fileMap.set(file, meta)
     }
@@ -206,13 +227,29 @@ class FileTree {
     return fileSet
   }
 
-  getFile (file) {
+  getFile (file, safe) {
     let fileMap = this.files
     let fileMeta = fileMap.get(file)
 
-    if (!fileMeta) throw new Error('Can`t find file: ' + file)
+    if (!fileMeta) {
+      if (!safe) {
+        throw new Error('Can`t find file: ' + file)
+      }
+
+      this.setFile(file)
+
+      return this.files.get(file)
+    }
 
     return fileMeta
+  }
+
+  getFileByDist (dist) {
+    if (this.outputMap[dist]) {
+      dist = this.outputMap[dist]
+    }
+
+    return this.getFile(dist, true)
   }
 
   removeFile (file) {

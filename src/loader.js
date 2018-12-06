@@ -4,6 +4,7 @@ const utils = require('./utils')
 const FileTree = require('./FileTree')
 const WXLoaderHelper = require('./wx/loader')
 const AliLoaderHelper = require('./ali/loader')
+const { toTargetPath } = require('./helpers/path')
 const { resolveFilesForLoader } = require('./helpers/component')
 const { reslovePagesFiles } = require('./helpers/page')
 const { update: setAppJson } = require('./helpers/app')
@@ -125,13 +126,14 @@ class MiniLoader {
       let promises = []
 
       for (const value of map.values()) {
-        code = code.replaceAll(value.origin, value.replace)
+        let reg = `('|")${value.origin}('|")`
+        code = code.replaceAll(reg, `"${value.replace}"`)
 
         /**
          * 动态添加依赖，使用 promise 是为了在所有依赖添加完成后
          * 再调用 callback，否则后添加的依赖不会被监听
          */
-        !tree.has(value.sourcePath) && promises.push(
+        promises.push(
           this.addDepsModule(value.sourcePath)
         )
 
@@ -165,7 +167,7 @@ class MiniLoader {
         if (!err) return resolve(src)
         // 如果添加依赖失败，把他从文件树中去除
         reject(err)
-        tree.remove(request)
+        tree.removeFile(request)
       })
     })
   }
@@ -214,22 +216,13 @@ class MiniLoader {
       if (!map.has(dep)) {
         map.set(dep, {
           origin: dep, // 原来代码中的依赖路径
-          replace: this.replaceDepPath(depPath), // 替换路径
+          replace: toTargetPath(depPath), // 替换路径
           sourcePath: depFile // 依赖文件，用于动态添加依赖
         })
       }
     }
 
     return map
-  }
-
-  replaceDepPath (file) {
-    let ext = path.extname(file)
-
-    if (!ext) throw new Error('接受到一个不正常的文件')
-
-    let method = 'T' + ext.substr(1, 1).toUpperCase() + ext.substr(2)
-    return method && this.targetHelper[method] ? this.targetHelper[method](file) : file
   }
 
   /**

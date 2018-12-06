@@ -4,6 +4,7 @@ const fs = require('fs')
 const readline = require('readline')
 const { dirname, join } = require('path')
 const { ConcatSource } = require('webpack-sources')
+const { util: { createHash } } = require('webpack')
 const utils = require('./utils')
 const MiniProgam = require('./MiniProgram')
 const { get: getAppJson } = require('./helpers/app')
@@ -79,6 +80,40 @@ class MiniPlugin extends MiniProgam {
         fs.readFileSync(join(__dirname, './lib/require.js'), 'utf8')
       )
       callback()
+    })
+
+    compilation.hooks.optimizeAssets.tap('MiniPlugin', (assets) => {
+      const assetsKey = Object.keys(assets)
+      const ignoreEntrys = this.getIgnoreEntrys()
+
+      const { outputOptions } = compilation
+      const {
+        hashFunction,
+        hashDigest,
+        hashDigestLength
+      } = outputOptions
+
+      assetsKey.forEach(key => {
+        const source = assets[key]
+        const fileMeta = this.fileTree.getFileByDist(utils.getDistPath(key), true)
+
+        if (ignoreEntrys.indexOf(key) > -1 || key === 'app.js') return
+
+        const hash = createHash(hashFunction)
+
+        source.updateHash(hash)
+
+        const contentHash = hash
+          .digest(hashDigest)
+          .substring(0, hashDigestLength)
+
+        if (fileMeta.hash === contentHash) {
+          delete assets[key]
+          return
+        }
+
+        fileMeta.updateHash(contentHash)
+      })
     })
 
     /**
@@ -225,6 +260,11 @@ class MiniPlugin extends MiniProgam {
    */
   messageOutPut (err, stat) {
     const { hash, startTime, endTime } = stat
+
+    stat = stat || {
+      compilation: {}
+    }
+
     const {
       warnings = [],
       errors = [],

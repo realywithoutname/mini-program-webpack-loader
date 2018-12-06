@@ -1,6 +1,3 @@
-const FileTree = require('../FileTree')
-
-let tree = new FileTree()
 module.exports = class AliLoaderHelper {
   constructor (file) {
     this.file = file
@@ -33,25 +30,5 @@ module.exports = class AliLoaderHelper {
     // }
 
     return content
-  }
-
-  TWxs (path) {
-    return path.replace('.wxs', '.sjs')
-  }
-
-  TWxml (path) {
-    return path.replace('.wxml', '.axml')
-  }
-
-  TWxss (path) {
-    return path.replace('.wxss', '.acss')
-  }
-
-  TScss (path) {
-    return path.replace('.scss', '.acss')
-  }
-
-  TPcss (path) {
-    return path.replace('.pcss', '.acss')
   }
 }
