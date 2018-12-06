@@ -123,24 +123,24 @@ class MiniPlugin extends MiniProgam {
       return this._appending.length > 0
     })
 
-    compilation.hooks.optimizeChunks.tap('MiniPlugin', chunks => {
-      let ignoreEntrys = this.getIgnoreEntrys()
-      for (const chunk of chunks) {
-        if (chunk.hasEntryModule() && !ignoreEntrys.indexOf(chunk.name) !== 0) {
-          // 记录模块之间依赖关系
-          for (const module of chunk.getModules()) {
-            if (!module.isEntryModule()) {
-              const resourcePath = module.resource
-              let relPath = utils.getDistPath(resourcePath)
-              let chunkName = chunk.name + '.js'
-              utils.setMapValue(DEPS_MAP, relPath, chunkName)
+    // compilation.hooks.optimizeChunks.tap('MiniPlugin', chunks => {
+    //   let ignoreEntrys = this.getIgnoreEntrys()
+    //   for (const chunk of chunks) {
+    //     if (chunk.hasEntryModule() && !ignoreEntrys.indexOf(chunk.name) !== 0) {
+    //       // 记录模块之间依赖关系
+    //       for (const module of chunk.getModules()) {
+    //         if (!module.isEntryModule()) {
+    //           const resourcePath = module.resource
+    //           let relPath = utils.getDistPath(resourcePath)
+    //           let chunkName = chunk.name + '.js'
+    //           utils.setMapValue(DEPS_MAP, relPath, chunkName)
 
-              module._usedModules = DEPS_MAP[relPath]
-            }
-          }
-        }
-      }
-    })
+    //           module._usedModules = DEPS_MAP[relPath]
+    //         }
+    //       }
+    //     }
+    //   }
+    // })
   }
 
   /**

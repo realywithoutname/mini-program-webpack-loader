@@ -8,7 +8,9 @@ const set = (target, key, val) => {
 
 let regRules = {
   '.js$': meta => set(meta, 'isJs', true),
-  '.json$': meta => set(meta, 'isJson', true) && set(meta, 'components', new Map()),
+  '.json$': meta => set(meta, 'isJson', true) &&
+    set(meta, 'components', new Map()) &&
+    set(meta, 'generics', new Map()),
   '.wxml$': meta => set(meta, 'isWxml', true) && set(meta, 'exteralClasses', new Set()),
   '.wxs$': meta => set(meta, 'isWxs', true),
   '.wxss$': meta => set(meta, 'isWxss', true),
@@ -284,6 +286,24 @@ class FileTree {
     }
 
     return wxmls
+  }
+
+  get jsons () {
+    let jsons = []
+
+    for (const { files } of this.pages.values()) {
+      for (const fileMeta of files) {
+        fileMeta.isJson && jsons.push(fileMeta.source)
+      }
+    }
+
+    for (const { files } of this.components.values()) {
+      for (const fileMeta of files) {
+        fileMeta.isJson && jsons.push(fileMeta.source)
+      }
+    }
+
+    return jsons
   }
 }
 

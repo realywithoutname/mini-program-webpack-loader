@@ -3,13 +3,19 @@ const { DomUtils } = require('htmlparser2')
 const utils = require('../utils')
 const FileTree = require('../FileTree')
 const Xml = require('../helpers/wxml')
+const { getAssetContent } = require('../helpers/compilation')
+const { toTargetPath } = require('../helpers/path')
 
 let tree = new FileTree()
 
 let eventSet = new Set()
 
 function componentHandle (forEachAttr) {
-  return ({ name, attribs, inComponents }) => {
+  return (componnets, { name, attribs, inComponents }) => {
+    let componentFileMeta = null
+    if (componnets.has(name)) {
+      componentFileMeta = tree.getFile(componnets.get(name))
+    }
     /**
      * 自定义组件上的 class 移动到自定义组件内
      */
@@ -59,7 +65,21 @@ function componentHandle (forEachAttr) {
         }
 
         if (/generic:/.test(attr)) {
-          attribs[attr.replace(/generic:/, '')] = attribs[attr]
+          let genericComponentPath = componnets[attribs[attr]]
+          let genericKey = attr.replace(/generic:/, '')
+          if (componentFileMeta) {
+            if (!componentFileMeta.generics.has(genericKey)) {
+              componentFileMeta.generics.set(genericKey, new Set())
+            }
+            let genericSet = componentFileMeta.generics.get(genericKey)
+
+            genericSet.add({
+              value: attribs[attr],
+              path: genericComponentPath
+            })
+          }
+
+          attribs[genericKey] = attribs[attr]
           delete attribs[attr]
         }
 
@@ -124,6 +144,10 @@ function transComClass (exteralClasses, attribs, depComPath) {
   })
 }
 
+function updateWxmlGeneric (generics, content) {
+  return new ConcatSource(content)
+}
+
 module.exports = async function (compilation, plugin) {
   let wxmls = tree.wxmls
   let assets = compilation.assets
@@ -158,7 +182,7 @@ module.exports = async function (compilation, plugin) {
 
     let coms = Xml.getCanUseComponents(file, false)
 
-    let distPath = utils.getDistPath(file).replace(/\.wxml$/, '.axml')
+    let distPath = toTargetPath(utils.getDistPath(file))
     let content = assets[distPath].source().toString()
 
     let dom = Xml.find(content, function ({ name, attribs = {} }) {
@@ -207,6 +231,36 @@ module.exports = async function (compilation, plugin) {
 
     assets[distPath] = new ConcatSource(content)
   }
+
+  // for (const file of tree.jsons) {
+  //   let fileMeta = tree.getFile(file)
+
+  //   if (fileMeta.generics.size) {
+  //     let distPath = toTargetPath(utils.getDistPath(file))
+  //     let jsonFileContent = getAssetContent(file, compilation)
+  //     let wxmlFileContent = assets[distPath].source().toString()
+
+  //     let usingComponents = jsonFileContent.usingComponents
+
+  //     let genericMap = {}
+  //     for (const [key, genericSet] of fileMeta.generics) {
+  //       let generics = genericMap[key] = []
+  //       for (const { value, genericComponentPath } of genericSet) {
+  //         let comPath = utils.relative(
+  //           utils.getDistPath(file),
+  //           utils.getDistPath(genericComponentPath)
+  //         ).replace('.json', '')
+
+  //         if (comPath !== usingComponents[key] && usingComponents[key]) throw new Error('存在相同的组件名引用不同的组件')
+  //         usingComponents[key] = comPath
+
+  //         generics.push(value)
+  //       }
+  //     }
+
+  //     assets[distPath] = updateWxmlGeneric(genericMap, wxmlFileContent)
+  //   }
+  // }
   // TODO 删除 template
   // Object.keys(assets).forEach(path => {
   //   if (rootXmlEntrys.indexOf(path) === -1 && /\.axml$/.test(path)) {

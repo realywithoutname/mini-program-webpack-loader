@@ -2,6 +2,7 @@ const { DomUtils, parseDOM } = require('htmlparser2')
 const { ConcatSource } = require('webpack-sources')
 const FileTree = require('../FileTree')
 const utils = require('../utils')
+const { getAssetContent } = require('./compilation')
 
 let tree = new FileTree()
 const wxNativeTags = ['view', 'scroll-view', 'swiper', 'movable-view', 'movable-aera', 'cover-view', 'cover-image', 'icon', 'text', 'rich-text', 'progress', 'button', 'checkbox', 'checkbox-group', 'form', 'input', 'label', 'picker', 'picker-view', 'picker-view-column', 'swiper-item', 'radio', 'slider', 'switch', 'textarea', 'navigator', 'functional-page-navigator', 'audio', 'image', 'video', 'camera', 'live-player', 'live-pusher', 'map', 'canvas', 'open-data', 'web-view', 'ad', 'official-account', 'template', 'wxs', 'import', 'include', 'block', 'slot']
@@ -36,8 +37,6 @@ module.exports = class Xml {
    * @param {*} request
    */
   static getCanUseComponents (request, useRelative = true) {
-    if (Xml[request] && Xml[request]._usingComponents) return Xml[request]._usingComponents
-
     request = request.replace('.wxml', '.json')
 
     let usingComponents = new Map()
@@ -69,16 +68,12 @@ module.exports = class Xml {
       merge(components)
     }
 
-    Xml[request] = {
-      _usingComponents: usingComponents
-    }
-
     return usingComponents
   }
 
   loadContent (entry, loaded = {}) {
     let { deps: depSet } = tree.getFile(entry)
-    let content = this.getAssetContent(entry)
+    let content = getAssetContent(entry, this.compilation)
     let buff = new ConcatSource()
 
     for (let { source } of depSet) {
@@ -107,33 +102,6 @@ module.exports = class Xml {
     return buff
   }
 
-  getAssetContent (file) {
-    let distPath = this.getDistPath(file)
-    let { assets, cache } = this.compilation
-
-    if (assets[distPath]) return assets[distPath].source().toString()
-
-    for (const key in cache) {
-      if (cache.hasOwnProperty(key)) {
-        const module = cache[key]
-
-        if (module.buildInfo && module.buildInfo.assets) {
-          for (const assetName of Object.keys(module.buildInfo.assets)) {
-            if (module.resource === file) {
-              return module.buildInfo.assets[assetName].source().toString()
-            }
-          }
-        }
-      }
-    }
-
-    this.compilation.errors.push(
-      new Error(`查找文件 ${file.yellow} 对应的内容时出现错误，请查找与该文件相关的错误信息`)
-    )
-
-    return '{}'
-  }
-
   hasUsingComponent (tag) {
     return wxNativeTags.indexOf(tag) === -1
   }
@@ -142,7 +110,7 @@ module.exports = class Xml {
     let request = this.request.replace('.wxml', '.json')
     const compoennts = Xml.getCanUseComponents(this.request)
     const undfnTags = []
-    const jsonCode = JSON.parse(this.getAssetContent(request))
+    const jsonCode = JSON.parse(getAssetContent(request, this.compilation))
 
     const usingComponents = jsonCode.usingComponents = jsonCode.usingComponents || {}
     const genericComponents = Object.keys(jsonCode.componentGenerics || {})
@@ -183,7 +151,7 @@ module.exports = class Xml {
     let content = this.buff.source().toString()
     let tags = []
 
-    const componnets = Xml.getCanUseComponents(this.request)
+    const componnets = Xml.getCanUseComponents(this.request, false)
 
     const dom = Xml.find(content, ({ name, attribs = {} }) => {
       if (name && this.hasUsingComponent(name)) {
@@ -202,7 +170,7 @@ module.exports = class Xml {
         })
       }
 
-      handle && handle({ name, attribs, inComponents: componnets.has(name) })
+      handle && handle(componnets, { name, attribs, inComponents: componnets.has(name) })
     })
 
     content = DomUtils.getInnerHTML({ children: dom })
