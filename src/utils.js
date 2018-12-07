@@ -163,7 +163,7 @@ exports.formatEntry = (context = process.cwd(), entry = [], chunkNames = []) => 
 }
 
 exports.relative = (from, to) => {
-  return relative(dirname(from), to)
+  return './' + relative(dirname(from), to)
 }
 
 /**

@@ -84,7 +84,7 @@ module.exports = class Xml {
         source = source.replace(/\.wxs$/, '.sjs')
 
         let originPath = './' + utils.relative(entry, source)
-        let newPath = './' + utils.relative(entry, source)
+        let newPath = './' + utils.relative(this.request, source)
 
         content = content.replaceAll(originPath, newPath)
         continue
@@ -153,7 +153,9 @@ module.exports = class Xml {
 
     const componnets = Xml.getCanUseComponents(this.request, false)
 
-    const dom = Xml.find(content, ({ name, attribs = {} }) => {
+    const dom = Xml.find(content, (el) => {
+      let { name, attribs = {} } = el
+
       if (name && this.hasUsingComponent(name)) {
         tags.push(name)
       }
@@ -170,7 +172,7 @@ module.exports = class Xml {
         })
       }
 
-      handle && handle(componnets, { name, attribs, inComponents: componnets.has(name) })
+      handle && handle(componnets, el, componnets.has(name), this.request)
     })
 
     content = DomUtils.getInnerHTML({ children: dom })

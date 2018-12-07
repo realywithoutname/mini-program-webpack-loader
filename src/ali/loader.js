@@ -11,14 +11,15 @@ module.exports = class AliLoaderHelper {
   transformWxml (content) {
     // wx
     content = content.replace(/wx:/g, 'a:')
-    content = content.replace(/<wxs/g, '<import-sjs')
-    content = content.replace(/wxs>/g, 'import-sjs>')
     // 事件
     content = content.replace(/\s+(bind|catch)[:]?([^\s]+?)=/g, ($0, $1, $2) => {
       return ` ${$1 === 'bind' ? 'on' : 'catch'}${$2[0].toUpperCase()}${$2.substr(1)}=`
     })
 
     content = content.replace(/<import.+?src=.+?[/>.+?</import]>\n/g, '')
+
+    content = content.replace(/<wxs/g, '<import-sjs')
+    content = content.replace(/wxs>/g, 'import-sjs>')
 
     // if (tree.components.has(this.componentPath)) {
     //   /**

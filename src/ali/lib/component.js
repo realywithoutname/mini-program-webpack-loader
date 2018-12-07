@@ -134,7 +134,7 @@ var triggerEvent = {
      * @param {*} e
      */
     $_tap: function (e) {
-      this.props.onTap && console.log(e, this.data.parentData)
+      this.props.onTap && console.log(e, this.is)
       this.props.onTap && this.props.onTap(e)
     },
     $merge: function (prevProps, prevData) {

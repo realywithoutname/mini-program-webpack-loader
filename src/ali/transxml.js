@@ -1,4 +1,5 @@
 const { ConcatSource } = require('webpack-sources')
+const { transform } = require('lebab')
 const { DomUtils } = require('htmlparser2')
 const utils = require('../utils')
 const FileTree = require('../FileTree')
@@ -11,7 +12,8 @@ let tree = new FileTree()
 let eventSet = new Set()
 
 function componentHandle (forEachAttr) {
-  return (componnets, { name, attribs, inComponents }) => {
+  return (componnets, el, inComponents, file) => {
+    let { name, attribs = {}, parent } = el
     let componentFileMeta = null
     if (componnets.has(name)) {
       componentFileMeta = tree.getFile(componnets.get(name))
@@ -26,7 +28,7 @@ function componentHandle (forEachAttr) {
     }
 
     /**
-     * 找到自定义组件使用的事件
+     * 对使用了自定义组件的节点进行处理
      */
     if (name && inComponents) {
       let attrs = Object.keys(attribs)
@@ -65,7 +67,7 @@ function componentHandle (forEachAttr) {
         }
 
         if (/generic:/.test(attr)) {
-          let genericComponentPath = componnets[attribs[attr]]
+          let genericComponentPath = componnets.get(attribs[attr])
           let genericKey = attr.replace(/generic:/, '')
           if (componentFileMeta) {
             if (!componentFileMeta.generics.has(genericKey)) {
@@ -80,6 +82,7 @@ function componentHandle (forEachAttr) {
           }
 
           attribs[genericKey] = attribs[attr]
+
           delete attribs[attr]
         }
 
@@ -92,6 +95,25 @@ function componentHandle (forEachAttr) {
       }
     }
 
+    /**
+     * 对所有的没有值的属性设置为 true
+     */
+    Object.keys(attribs).forEach(attr => {
+      if (!attribs[attr] && attribs.hasOwnProperty(attr)) {
+        attribs[attr] = 'true'
+      }
+    })
+
+    if (name === 'import-sjs') {
+      if (!attribs.src) {
+        console.error(file, '文件中内联了 wxs，将不会生效')
+      } else {
+        attribs.from = attribs.src
+        attribs.name = attribs.module
+        delete attribs.src
+        delete attribs.module
+      }
+    }
     /**
      * 自定义组件 ID 选择
      */
@@ -145,7 +167,37 @@ function transComClass (exteralClasses, attribs, depComPath) {
 }
 
 function updateWxmlGeneric (generics, content) {
-  return new ConcatSource(content)
+  let genericKeys = Object.keys(generics)
+
+  let dom = Xml.find(content, (el) => {
+    let { name, attribs, children, parent } = el
+    if (~genericKeys.indexOf(name) && generics[name].length) {
+      let prop = utils.camelCase(name, {
+        recognizeSelfClosing: true,
+        lowerCaseAttributeNames: false
+      })
+
+      generics[name].forEach(propName => {
+        let index = parent.children.indexOf(el)
+
+        let genericDom = Xml.find(`<block a:if="{{ ${prop} === '${propName}' }}">
+          <${propName} />
+        </block>`, (el) => {
+          if (el.name === propName) {
+            el.attribs = { ...attribs }
+            el.children = children
+          }
+        })
+
+        parent.children.splice(index, 0, genericDom[0])
+      })
+
+      attribs['a:else'] = 'true'
+    }
+  })
+
+  DomUtils.getInnerHTML({ children: dom })
+  return new ConcatSource(DomUtils.getInnerHTML({ children: dom }))
 }
 
 module.exports = async function (compilation, plugin) {
@@ -160,9 +212,9 @@ module.exports = async function (compilation, plugin) {
 
     const handle = componentHandle(function forEachAttr (name, attr, value) {
       /**
-           * 把所有的 externalClasses 属性添加到这个组件的属性中，
-           * 方便在后边对这个文件处理，以便支持 externalClasses
-           */
+       * 把所有的 externalClasses 属性添加到这个组件的属性中，
+       * 方便在后边对这个文件处理，以便支持 externalClasses
+       */
       if (/-class/.test(attr) && coms.has(name)) {
         let comWxmlPath = coms.get(name).replace('.json', '.wxml')
         let fileMeta = tree.getFile(comWxmlPath)
@@ -232,35 +284,57 @@ module.exports = async function (compilation, plugin) {
     assets[distPath] = new ConcatSource(content)
   }
 
-  // for (const file of tree.jsons) {
-  //   let fileMeta = tree.getFile(file)
+  for (const file of tree.jsons) {
+    let fileMeta = tree.getFile(file)
 
-  //   if (fileMeta.generics.size) {
-  //     let distPath = toTargetPath(utils.getDistPath(file))
-  //     let jsonFileContent = getAssetContent(file, compilation)
-  //     let wxmlFileContent = assets[distPath].source().toString()
+    if (fileMeta.generics.size) {
+      let wxmlPath = file.replace('.json', '.wxml')
+      let distJsonPath = toTargetPath(utils.getDistPath(file))
+      let distWxmlPath = toTargetPath(utils.getDistPath(wxmlPath))
+      let jsonFileContent = JSON.parse(getAssetContent(file, compilation))
+      let wxmlFileContent = assets[distWxmlPath].source().toString()
 
-  //     let usingComponents = jsonFileContent.usingComponents
+      jsonFileContent.usingComponents = jsonFileContent.usingComponents || {}
 
-  //     let genericMap = {}
-  //     for (const [key, genericSet] of fileMeta.generics) {
-  //       let generics = genericMap[key] = []
-  //       for (const { value, genericComponentPath } of genericSet) {
-  //         let comPath = utils.relative(
-  //           utils.getDistPath(file),
-  //           utils.getDistPath(genericComponentPath)
-  //         ).replace('.json', '')
+      let { componentGenerics, usingComponents } = jsonFileContent
 
-  //         if (comPath !== usingComponents[key] && usingComponents[key]) throw new Error('存在相同的组件名引用不同的组件')
-  //         usingComponents[key] = comPath
+      Object.keys(componentGenerics).forEach(key => {
+        if (typeof componentGenerics[key] === 'object') {
+          usingComponents[key] = componentGenerics[key].default
+        }
+      })
 
-  //         generics.push(value)
-  //       }
-  //     }
+      let genericMap = {}
+      for (const [key, genericSet] of fileMeta.generics) {
+        let generics = genericMap[key] = []
+        for (const { value, path } of genericSet) {
+          let comPath = utils.relative(
+            utils.getDistPath(file),
+            utils.getDistPath(path)
+          ).replace('.json', '')
 
-  //     assets[distPath] = updateWxmlGeneric(genericMap, wxmlFileContent)
-  //   }
-  // }
+          if (comPath !== usingComponents[value] && usingComponents[value]) throw new Error('存在相同的组件名引用不同的组件')
+          usingComponents[value] = comPath
+
+          generics.push(value)
+        }
+      }
+
+      assets[distJsonPath] = new ConcatSource(JSON.stringify(jsonFileContent))
+      assets[distWxmlPath] = updateWxmlGeneric(genericMap, wxmlFileContent)
+    }
+  }
+
+  for (const file of tree.wxs) {
+    let distPath = toTargetPath(
+      utils.getDistPath(file)
+    )
+    let code = getAssetContent(file, compilation)
+    let result = transform(code, ['commonjs'])
+
+    // console.log(result.code, distPath)
+    assets[distPath] = new ConcatSource(result.code)
+  }
   // TODO 删除 template
   // Object.keys(assets).forEach(path => {
   //   if (rootXmlEntrys.indexOf(path) === -1 && /\.axml$/.test(path)) {

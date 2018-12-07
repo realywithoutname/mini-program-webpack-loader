@@ -305,6 +305,16 @@ class FileTree {
 
     return jsons
   }
+
+  get wxs () {
+    let wxs = []
+
+    for (const fileMeta of this.files.values()) {
+      fileMeta.isWxs && wxs.push(fileMeta.source)
+    }
+
+    return wxs
+  }
 }
 
 module.exports = FileTree
