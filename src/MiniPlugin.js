@@ -383,23 +383,22 @@ class MiniPlugin extends MiniProgam {
   }
 
   consoleMsg (messages) {
-    console.log(messages)
-    // messages.forEach((err) => {
-    //   if (!err.module || !err.module.id) {
-    //     return console.log(err)
-    //   }
+    messages.forEach((err) => {
+      if (!err.module || !err.module.id) {
+        return console.log(err)
+      }
 
-    //   let message = err.message.split(/\n\n|\n/)
-    //   let mainMessage = message[0] || ''
-    //   let lc = mainMessage.match(/\((\d+:\d+)\)/)
-    //   lc = lc ? lc[1] : '1:1'
+      let message = err.message.split(/\n\n|\n/)
+      let mainMessage = message[0] || ''
+      let lc = mainMessage.match(/\((\d+:\d+)\)/)
+      lc = lc ? lc[1] : '1:1'
 
-    //   console.log('Error in file', (err.module && err.module.id + ':' + lc).red)
-    //   console.log(mainMessage.gray)
-    //   message[1] && console.log(message[1].gray)
-    //   message[2] && console.log(message[2].gray)
-    //   console.log('')
-    // })
+      console.log('Error in file', (err.module && err.module.id + ':' + lc).red)
+      console.log(mainMessage.gray)
+      message[1] && console.log(message[1].gray)
+      message[2] && console.log(message[2].gray)
+      console.log('')
+    })
   }
 }
 
