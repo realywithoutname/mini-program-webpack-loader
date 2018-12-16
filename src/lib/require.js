@@ -13,7 +13,8 @@ module.exports = function (entry, modules) {
 			l: false,
 			exports: {}
 		};
-
+		// if (!modules[moduleId]) 
+		// 	debugger
     // Execute the module function
 		modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
 

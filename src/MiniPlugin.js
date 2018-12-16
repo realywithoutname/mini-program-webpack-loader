@@ -1,27 +1,13 @@
-require('console.table');
-const colors = require('colors');
-const fs = require('fs');
-const readline = require('readline');
-const {
-  dirname,
-  join,
-  relative,
-  extname,
-  basename,
-  isAbsolute
-} = require('path');
-const { ProgressPlugin } = require('webpack')
+require('console.table')
+require('colors')
+const fs = require('fs')
+const readline = require('readline')
+const { dirname, join } = require('path')
 const { ConcatSource } = require('webpack-sources')
-const loader = require('./loader');
-const utils = require('./utils');
-const MiniTemplate = require('./MiniTemplate');
+const { util: { createHash } } = require('webpack')
+const utils = require('./utils')
 const MiniProgam = require('./MiniProgram')
-const {
-  NodeJsInputFileSystem,
-  CachedInputFileSystem,
-  ResolverFactory
-} = require('enhanced-resolve');
-
+const { get: getAppJson } = require('./helpers/app')
 const stdout = process.stdout
 
 const DEPS_MAP = {}
@@ -29,78 +15,43 @@ const COMPONENT_DEPS_MAP = {}
 const ONLY_SUBPACKAGE_USED_MODULE_MAP = {}
 
 class MiniPlugin extends MiniProgam {
-  constructor (options) {
-    super(options)
-  }
-
-  apply(compiler) {
-    this.compiler = compiler;
-    this.outputPath = compiler.options.output.path;
-    this.compilerContext = join(compiler.context, 'src');
-
-    this._appending = [];
-
-    // 向 loader 中传递插件实例
-    loader.$applyPluginInstance(this);
-
-    // 使用模板插件，用于设置输出格式
-    new MiniTemplate(this).apply(compiler);
-    new ProgressPlugin({ handler: this.progress }).apply(compiler)
-
-    const resolver = ResolverFactory.createResolver(
-      Object.assign(
-        {
-          fileSystem: new CachedInputFileSystem(new NodeJsInputFileSystem(), 4000),
-          extensions: ['.js', '.json'],
-        },
-        this.compiler.options.resolve
-      )
-    );
-
-    this.resolver = (context, request) => {
-      return new Promise((resolve, reject) => {
-        resolver.resolve({}, context, request, {}, (err, res) => err ? reject(err) : resolve(res))
-      })
-    }
-    
-    this.miniEntrys = utils.formatEntry(compiler.options.entry, this.chunkNames)
-
-    // 获取打包后路径（在 loader 中有使用）
-    this.getDistFilePath = () => {};
+  apply (compiler) {
+    super.apply(compiler)
+    this._appending = []
 
     // hooks
-    this.compiler.hooks.environment.tap('MiniPlugin', this.setEnvHook.bind(this));
+    this.compiler.hooks.environment.tap('MiniPlugin', this.setEnvHook.bind(this))
     this.compiler.hooks.beforeCompile.tapAsync('MiniPlugin', this.beforeCompile.bind(this))
-    this.compiler.hooks.compilation.tap('MiniPlugin', this.setCompilation.bind(this));
-    this.compiler.hooks.emit.tapAsync('MiniPlugin', this.setEmitHook.bind(this));
-    this.compiler.hooks.additionalPass.tapAsync('MiniPlugin', this.setAdditionalPassHook.bind(this));
+    this.compiler.hooks.compilation.tap('MiniPlugin', this.setCompilation.bind(this))
+    this.compiler.hooks.emit.tapAsync('MiniPlugin', this.setEmitHook.bind(this))
+    this.compiler.hooks.additionalPass.tapAsync('MiniPlugin', this.setAdditionalPassHook.bind(this))
   }
 
-  beforeCompile(params, callback) {
+  /**
+   * 根据入口文件进行构建依赖
+   * @param {*} params
+   * @param {*} callback
+   */
+  beforeCompile (params, callback) {
+    if (this.hasLoaded) return callback()
+
     this.loadEntrys(this.miniEntrys)
       .then(() => {
-        let resourcePaths = new Set(
-          this.entryContexts.concat(
-            this.options.resources
-          )
-        )
-
-        resourcePaths.add(this.compilerContext)
         // 设置子包的 cachegroup
         this.options.commonSubPackages && this.setCacheGroup()
-        this.getDistFilePath = utils.getDistPath(this.compilerContext, Array.from(resourcePaths), this.outputPath)
-
+        this.hasLoaded = true
         callback()
       })
   }
+
   /**
    * 重写 webpack.watch
    */
-  setEnvHook() {
-    let watch = this.compiler.watch;
-    let run = this.compiler.run;
+  setEnvHook () {
+    let watch = this.compiler.watch
+    let run = this.compiler.run
 
-    this.compiler.watch = options => watch.call(this.compiler, this.compiler.options, this.messageOutPut.bind(this));
+    this.compiler.watch = options => watch.call(this.compiler, this.compiler.options, this.messageOutPut.bind(this))
 
     this.compiler.run = () => run.call(this.compiler, this.messageOutPut.bind(this))
   }
@@ -109,48 +60,84 @@ class MiniPlugin extends MiniProgam {
    * 获取文件与打包输出目录的相对路径
    * @param {String} path 文件的绝对路径
    */
-  getAesstPathHook(path) {
-    return this.getDistFilePath(path);
+  getAesstPathHook (path) {
+    return utils.getDistPath(path)
   }
 
   /**
    * compilation 事件处理
    * @param {*} compilation
    */
-  setCompilation(compilation) {
+  setCompilation (compilation) {
+    this.helperPlugin.setCompilation && this.helperPlugin.setCompilation(compilation)
     /**
      * 标准输出文件名称
      */
-    compilation.mainTemplate.hooks.assetPath.tap('MiniPlugin', this.getAesstPathHook.bind(this));
+    compilation.mainTemplate.hooks.assetPath.tap('MiniPlugin', this.getAesstPathHook.bind(this))
 
     compilation.hooks.additionalAssets.tapAsync('MiniPlugin', callback => {
       compilation.assets['webpack-require.js'] = new ConcatSource(
         fs.readFileSync(join(__dirname, './lib/require.js'), 'utf8')
-      );
+      )
       callback()
-    });
+    })
+
+    compilation.hooks.optimizeAssets.tap('MiniPlugin', (assets) => {
+      const assetsKey = Object.keys(assets)
+      const ignoreEntrys = this.getIgnoreEntrys()
+
+      const { outputOptions } = compilation
+      const {
+        hashFunction,
+        hashDigest,
+        hashDigestLength
+      } = outputOptions
+
+      assetsKey.forEach(key => {
+        const source = assets[key]
+        const fileMeta = this.fileTree.getFileByDist(utils.getDistPath(key), true)
+
+        if (ignoreEntrys.indexOf(key) > -1 || key === 'app.js') return
+
+        const hash = createHash(hashFunction)
+
+        source.updateHash(hash)
+
+        const contentHash = hash
+          .digest(hashDigest)
+          .substring(0, hashDigestLength)
+
+        if (fileMeta.hash === contentHash) {
+          delete assets[key]
+          return
+        }
+
+        fileMeta.updateHash(contentHash)
+      })
+    })
 
     /**
      * 检查是否有需要动态添加的入口文件，如果有需要重新编译
      */
     compilation.hooks.needAdditionalPass.tap('MiniPlugin', () => {
-      return this._appending.length > 0;
-    });
+      return this._appending.length > 0
+    })
 
     compilation.hooks.optimizeChunks.tap('MiniPlugin', chunks => {
       let ignoreEntrys = this.getIgnoreEntrys()
       for (const chunk of chunks) {
         if (chunk.hasEntryModule() && !ignoreEntrys.indexOf(chunk.name) !== 0) {
           // 记录模块之间依赖关系
-          for (const module of chunk.getModules())
+          for (const module of chunk.getModules()) {
             if (!module.isEntryModule()) {
               const resourcePath = module.resource
-              let relPath = this.getDistFilePath(resourcePath)
+              let relPath = utils.getDistPath(resourcePath)
               let chunkName = chunk.name + '.js'
               utils.setMapValue(DEPS_MAP, relPath, chunkName)
 
               module._usedModules = DEPS_MAP[relPath]
             }
+          }
         }
       }
     })
@@ -160,63 +147,68 @@ class MiniPlugin extends MiniProgam {
    * 动态添加文件，有些自定义组件，对应的 js 文件需要作为入口文件。
    * @param {Function} callback webpack compilation callback
    */
-  setAdditionalPassHook(callback) {
+  setAdditionalPassHook (callback) {
     if (this._appending.length > 0) {
-      this.addEntrys(this.compilerContext, this._appending);
+      this.addEntrys(this.compilerContext, this._appending)
     }
-    this._appending = [];
-    callback();
+    this._appending = []
+    callback()
   }
 
-  setEmitHook(compilation, callback) {
-    let ignoreEntrys = this.getIgnoreEntrys();
-    let assets = compilation.assets;
+  setEmitHook (compilation, callback) {
+    let ignoreEntrys = this.getIgnoreEntrys()
+    let assets = compilation.assets
 
     /**
      * 合并 app.json
      */
-    assets['app.json'] = this.getAppJsonCode();
+    assets['app.json'] = this.helperPlugin.getAppJsonCode()
 
     console.assert(assets['app.json'], 'app.json 不应该为空')
     /**
      * 直接替换 js 代码
      */
     console.assert(assets[this.mainName + '.js'], `${join(this.mainContext, this.mainName + '.js')} 不应该不存在`)
-    assets['app.js'] = assets[this.mainName + '.js'];
+    assets['app.js'] = this.helperPlugin.getAppJsCode(assets[this.mainName + '.js'])
 
     /**
      * 合并 .wxss 代码到 app.wxss
      */
-    assets['app.wxss'] = this.getAppWxss(compilation);
-
+    assets['app.wxss'] = this.getAppWxss(compilation)
 
     /**
      * ext.json 如果是字符串并且存在则读取文件
      */
     if (typeof this.options.extfile === 'string') {
-        assets['ext.json'] = this.getExtJson()
+      assets['ext.json'] = this.getExtJson()
     }
 
     /**
      * 检查一些 js 文件路径
      */
     for (const file in assets) {
-      let tempFile = this.getDistFilePath(file);
+      let tempFile = utils.getDistPath(file)
 
       if (tempFile !== file) {
-        assets[tempFile] = assets[file];
-        delete assets[file];
+        assets[tempFile] = assets[file]
+        delete assets[file]
       }
 
       if (ignoreEntrys.indexOf(file) > -1 || /node_modules/.test(file)) {
-        delete assets[file];
+        delete assets[file]
       }
     }
-    callback();
+
+    if (this.options.target === 'ali') {
+      assets['app.acss'] = assets['app.wxss']
+      delete assets['app.wxss']
+    }
+
+    this.helperPlugin.emitHook(compilation, callback)
   }
 
-  setCacheGroup() {
-    let appJson = this.getAppJson()
+  setCacheGroup () {
+    let appJson = getAppJson()
     let cachegroups = this.compiler.options.optimization.splitChunks.cacheGroups
 
     if (this.options.setSubPackageCacheGroup) {
@@ -240,28 +232,11 @@ class MiniPlugin extends MiniProgam {
   }
 
   /**
-   * loader 中传递需要添加为入口文件的 js 文件
-   * @param {Array} assets 组件文件数组
-   * @param {Array} components 组件数组
+   * 添加下一次编译新增的文件
+   * @param {*} files
    */
-  addNewConponentFiles(assets, components, resourcePath) {
-    this.options.analyze && this.setComponentDeps(components, resourcePath)
-    components.forEach(component => !this.componentSet.has(component) && this.componentSet.add(component));
-    this._appending = this._appending.concat(assets.filter(file => !this.filesSet.has(file)));
-  }
-
-  /**
-   * 设置组件被依赖的关系
-   * @param {*} components
-   * @param {*} resourcePath
-   */
-  setComponentDeps(components, resourcePath) {
-    let pagePath = this.getDistFilePath(resourcePath).replace(/\.json$/, '')
-
-    for (let component of components) {
-      component = this.getDistFilePath(component)
-      utils.setMapValue(COMPONENT_DEPS_MAP, component, pagePath)
-    }
+  newFilesEntryFromLoader (files) {
+    this._appending = this._appending.concat(files)
   }
 
   /**
@@ -271,8 +246,8 @@ class MiniPlugin extends MiniProgam {
    * @param {*} modules
    */
   progress (progress, event, modules) {
-    readline.clearLine(process.stdout);
-    readline.cursorTo(process.stdout, 0);
+    readline.clearLine(process.stdout)
+    readline.cursorTo(process.stdout, 0)
 
     if (+progress === 1) return
     stdout.write(`${'正在打包: '.gray} ${`${(progress * 100).toFixed(2)}%`.green} ${event || ''} ${modules || ''}`)
@@ -283,18 +258,19 @@ class MiniPlugin extends MiniProgam {
    * @param {*} err
    * @param {*} stat
    */
-  messageOutPut(err, stat) {
-    const { hash, startTime, endTime } = stat;
+  messageOutPut (err, stat) {
+    const { hash, startTime, endTime } = stat
+
+    stat = stat || {
+      compilation: {}
+    }
+
     const {
       warnings = [],
       errors = [],
       assets
-    } = stat.compilation;
-    let subPackagePages = 0
-
-    for (const [root, pages] of this.subpackageMap) {
-      subPackagePages += pages.length
-    }
+    } = stat.compilation
+    let appJson = getAppJson()
 
     let size = 0
 
@@ -302,21 +278,22 @@ class MiniPlugin extends MiniProgam {
       size += assets[key].size()
     }
 
+    // fs.writeFileSync('./r.json', JSON.stringify(Object.keys(assets), null, 2), 'utf-8')
     let ot = [{
       time: (new Date()).toLocaleTimeString().gray,
       status: !errors.length ? 'success'.green : 'fail'.red,
-      watch: this.filesSet.size,
-      page: this.pagesSet.size,
-      component: this.componentSet.size,
-      subpackage: this.subpackageMap.size + '/' + subPackagePages,
+      watch: this.fileTree.size + '/' + Object.keys(assets).length,
+      page: this.fileTree.pageSize,
+      component: this.fileTree.comSize,
+      subpackage: appJson.subPackages.length + '/' + this.fileTree.subPageSize,
       duration: ((endTime - startTime) / 1000 + 's').green,
       size: ((size / 1024).toFixed(2) + ' k').green,
       hash
-    }];
+    }]
 
     if (warnings.length) {
       ot[0].warning = (warnings.length + '').yellow
-      this.consoleMsg(warnings);
+      this.consoleMsg(warnings)
     }
 
     if (errors.length) {
@@ -355,7 +332,7 @@ class MiniPlugin extends MiniProgam {
         const files = analyzeMap.fileUsed[key] = Array.from(DEPS_MAP[key])
 
         if (files.length >= 20) {
-          fileWarnings.push(`文件 ${ key.blue } 被引用 ${ (files.length + '').red } 次`)
+          fileWarnings.push(`文件 ${key.blue} 被引用 ${(files.length + '').red} 次`)
         }
       }
 
@@ -368,10 +345,10 @@ class MiniPlugin extends MiniProgam {
         // 组件只在子包或者某个目录下的文件中使用，提示
         if (packageRoot) { // 使用组件的文件在同一个子包内
           let isInPackage = this.pathsInSamePackage([key, components[0]])
-          !isInPackage && componentWarnings.push(`自定义组件 ${key.blue} 建议移动到子包 ${ packageRoot.red } 内`)
+          !isInPackage && componentWarnings.push(`自定义组件 ${key.blue} 建议移动到子包 ${packageRoot.red} 内`)
         } else if (components.length === 1 && !this.pathsInSameFolder([key, ...components])) {
           // 只有一个页面（组件）使用了该自定义组件
-          componentWarnings.push(`自定义组件 ${key.blue} 建议移动到 ${ dirname(components[0]).red } 目录内`)
+          componentWarnings.push(`自定义组件 ${key.blue} 建议移动到 ${dirname(components[0]).red} 目录内`)
         }
       }
 
@@ -400,9 +377,9 @@ class MiniPlugin extends MiniProgam {
     }
 
     console.log('')
-    console.table(ot);
+    console.table(ot)
 
-    this.options.compilationFinish && this.options.compilationFinish(err, stat, this.getAppJson())
+    this.options.compilationFinish && this.options.compilationFinish(err, stat, appJson)
   }
 
   consoleMsg (messages) {
@@ -411,18 +388,18 @@ class MiniPlugin extends MiniProgam {
         return console.log(err)
       }
 
-      let message = err.message.split(/\n\n|\n/);
-      let mainMessage = message[0] || '';
-      let lc = mainMessage.match(/\((\d+:\d+)\)/);
-      lc = lc ? lc[1] : '1:1';
+      let message = err.message.split(/\n\n|\n/)
+      let mainMessage = message[0] || ''
+      let lc = mainMessage.match(/\((\d+:\d+)\)/)
+      lc = lc ? lc[1] : '1:1'
 
-      console.log('Error in file', (err.module && err.module.id + ':' + lc).red);
-      console.log(mainMessage.gray);
-      message[1] && console.log(message[1].gray);
-      message[2] && console.log(message[2].gray);
-      console.log('');
-    });
+      console.log('Error in file', (err.module && err.module.id + ':' + lc).red)
+      console.log(mainMessage.gray)
+      message[1] && console.log(message[1].gray)
+      message[2] && console.log(message[2].gray)
+      console.log('')
+    })
   }
 }
 
-module.exports = MiniPlugin;
+module.exports = MiniPlugin
