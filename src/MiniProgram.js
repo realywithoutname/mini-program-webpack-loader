@@ -30,7 +30,12 @@ const defaultOptions = {
   commonSubPackages: true,
   analyze: false,
   resources: [],
-  compilationFinish: null
+  compilationFinish: null,
+  entry: {
+    // 入口文件的配置
+    // ignore
+    // accept
+  }
 }
 
 const mainChunkNameTemplate = '__assets_chunk_name__'
@@ -160,9 +165,39 @@ module.exports = class MiniProgam {
 
   addScriptEntry (context, entrys) {
     for (const entry of entrys) {
-      let fileName = relative(context, entry).replace(extname(entry), '')
+      let fileName = utils.getDistPath(entry).replace(extname(entry), '')
       new SingleEntryPlugin(context, entry, fileName).apply(this.compiler)
     }
+  }
+
+  getEntryConfig (entry, config) {
+    let entryConfig = this.options.entry[entry]
+    if (!entryConfig) return config
+
+    let { accept = {}, ignore = {} } = entryConfig
+
+    config = JSON.parse(JSON.stringify(config))
+
+    Object.keys(ignore).forEach(key => delete config[key])
+
+    Object.keys(config).forEach(key => {
+      if (Object.keys(accept).indexOf(key) > -1) return
+      delete config[key]
+    })
+
+    const { pages = [], subPackages = [] } = config
+    let {
+      pages: acceptPages = [],
+      subPackages: acceptSubPages = []
+    } = accept
+
+    if (!Array.isArray(acceptPages)) acceptPages = pages
+    if (!Array.isArray(acceptSubPages)) acceptPages = subPackages.map(({ root }) => root)
+
+    config.pages = pages.filter(page => acceptPages.indexOf(page) > -1)
+    config.subPackages = subPackages.filter(({ root }) => acceptSubPages.indexOf(root) > -1)
+
+    return config
   }
 
   async loadEntrys (entry) {
@@ -190,7 +225,8 @@ module.exports = class MiniProgam {
       /**
        * 获取配置信息，并设置，因为设置分包引用提取，需要先设置好
        */
-      const config = require(entryPath)
+      const config = this.getEntryConfig(entryPath, require(entryPath))
+
       setAppJson(config, entryPath, entryPath === this.mainEntry)
 
       /**
@@ -208,10 +244,10 @@ module.exports = class MiniProgam {
        */
       this.addEntrys(itemContext, [pageFiles, entryFiles, entryPath])
 
-      this.fileTree.setFile(entryFiles)
+      this.fileTree.setFile(entryFiles, true /* ignore */)
       this.fileTree.addEntry(entryPath)
 
-      pageFiles.push(entryPath)
+      config.usingComponents && pageFiles.push(entryPath)
 
       componentFiles[itemContext] = (componentFiles[itemContext] || []).concat(
         pageFiles.filter((file) => this.fileTree.getFile(file).isJson)

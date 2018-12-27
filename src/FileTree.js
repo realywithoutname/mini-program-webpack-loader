@@ -128,7 +128,7 @@ class FileTree {
 
   addEntry (entry) {
     if (!this.entry.has(entry)) {
-      this.tree.set(entry, this.setFile([entry]))
+      this.tree.set(entry, this.setFile([entry], true))
       this.entry.add(entry)
     }
   }
@@ -199,7 +199,7 @@ class FileTree {
     return this.pages.has(page)
   }
 
-  setFile (files) {
+  setFile (files, ignore) {
     let fileMap = this.files
     let fileSet = new Set()
 
@@ -212,8 +212,10 @@ class FileTree {
       }
 
       let meta = getFileMeta(file)
+      let distFile = this.outputMap[meta.dist]
 
-      if (this.outputMap[meta.dist]) {
+      // 允许引用不同的 node_modules 下的文件
+      if (!ignore && distFile && (!/node_modules/.test(distFile) || !/node_modules/.test(file))) {
         throw new Error(`
           项目存在不同文件输出到一个文件的情况：
           ${this.outputMap[meta.dist]} 以及 ${file}

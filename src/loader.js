@@ -65,9 +65,13 @@ class MiniLoader {
      * 应用配置文件，如 app.json，通知插件，对这里面的内容处理
      */
     if (pages.length || subPackages.length) {
+      json = this.$plugin.getEntryConfig(this.fileMeta.source, json)
+
       let newFiles = reslovePagesFiles(json, this.context)
 
       await this.addFilesToComplier(newFiles)
+
+      usingComponents = json.usingComponents
 
       setAppJson(json, this.fileMeta.source)
     }

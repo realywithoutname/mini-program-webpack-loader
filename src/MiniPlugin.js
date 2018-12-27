@@ -85,6 +85,7 @@ class MiniPlugin extends MiniProgam {
     compilation.hooks.optimizeAssets.tap('MiniPlugin', (assets) => {
       const assetsKey = Object.keys(assets)
       const ignoreEntrys = this.getIgnoreEntrys()
+      const entryNames = [...new Set(this.entryNames)]
 
       const { outputOptions } = compilation
       const {
@@ -93,11 +94,16 @@ class MiniPlugin extends MiniProgam {
         hashDigestLength
       } = outputOptions
 
+      const ignoreFiles = utils.flattenDeep([
+        ignoreEntrys,
+        entryNames.map(name => ['.wxss', '.js', '.json'].map(ext => `${name}${ext}`))
+      ])
+
       assetsKey.forEach(key => {
         const source = assets[key]
         const fileMeta = this.fileTree.getFileByDist(utils.getDistPath(key), true)
 
-        if (ignoreEntrys.indexOf(key) > -1 || key === 'app.js') return
+        if (ignoreFiles.indexOf(key) > -1) return
 
         const hash = createHash(hashFunction)
 
