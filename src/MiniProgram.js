@@ -31,6 +31,7 @@ const defaultOptions = {
   analyze: false,
   resources: [],
   compilationFinish: null,
+  forPlugin: false,
   entry: {
     // 入口文件的配置
     // ignore

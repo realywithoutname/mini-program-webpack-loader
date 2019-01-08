@@ -165,22 +165,26 @@ class MiniPlugin extends MiniProgam {
     let ignoreEntrys = this.getIgnoreEntrys()
     let assets = compilation.assets
 
-    /**
-     * 合并 app.json
-     */
-    assets['app.json'] = this.helperPlugin.getAppJsonCode()
+    if (!this.options.forPlugin) {
+      /**
+       * 合并 app.json
+       */
+      assets['app.json'] = this.helperPlugin.getAppJsonCode()
 
-    console.assert(assets['app.json'], 'app.json 不应该为空')
-    /**
-     * 直接替换 js 代码
-     */
-    console.assert(assets[this.mainName + '.js'], `${join(this.mainContext, this.mainName + '.js')} 不应该不存在`)
-    assets['app.js'] = this.helperPlugin.getAppJsCode(assets[this.mainName + '.js'])
+      console.assert(assets['app.json'], 'app.json 不应该为空')
+      /**
+       * 直接替换 js 代码
+       */
+      console.assert(assets[this.mainName + '.js'], `${join(this.mainContext, this.mainName + '.js')} 不应该不存在`)
+      assets['app.js'] = this.helperPlugin.getAppJsCode(assets[this.mainName + '.js'])
 
-    /**
-     * 合并 .wxss 代码到 app.wxss
-     */
-    assets['app.wxss'] = this.getAppWxss(compilation)
+      /**
+       * 合并 .wxss 代码到 app.wxss
+       */
+      assets['app.wxss'] = this.getAppWxss(compilation)
+    } else {
+      delete assets['app.json']
+    }
 
     /**
      * ext.json 如果是字符串并且存在则读取文件
