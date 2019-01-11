@@ -280,7 +280,8 @@ module.exports = class MiniProgam {
           return resolveComponentsFiles(
             this.resolver,
             componentFiles[context],
-            componentSet
+            componentSet,
+            this.options
           )
             .then(() => this.addEntrys(context, Array.from(componentSet)))
         })

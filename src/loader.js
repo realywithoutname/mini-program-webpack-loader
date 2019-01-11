@@ -88,7 +88,8 @@ class MiniLoader {
       this.resolve,
       this.fileMeta.source,
       json,
-      this.getDepPath.bind(this)
+      this.getDepPath.bind(this),
+      this.$plugin.options
     )
 
     return this.addFilesToComplier(assets).then(

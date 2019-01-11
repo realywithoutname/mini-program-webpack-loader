@@ -193,10 +193,16 @@ class MiniPlugin extends MiniProgam {
      * 检查一些 js 文件路径
      */
     for (const file in assets) {
+      const { replaceSrc } = this.options
       let tempFile = utils.getDistPath(file)
 
       if (tempFile !== file) {
         assets[tempFile] = assets[file]
+        delete assets[file]
+      }
+
+      if (replaceSrc && file.indexOf(replaceSrc) > -1) {
+        assets[file.split(`${replaceSrc}/`)[1]] = assets[file]
         delete assets[file]
       }
 
