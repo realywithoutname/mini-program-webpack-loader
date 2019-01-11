@@ -2,7 +2,6 @@ const { existsSync, readFileSync } = require('fs')
 const {
   dirname,
   join,
-  relative,
   extname,
   basename
 } = require('path')
@@ -179,10 +178,15 @@ module.exports = class MiniProgam {
 
     config = JSON.parse(JSON.stringify(config))
 
-    Object.keys(ignore).forEach(key => delete config[key])
+    Object.keys(ignore).forEach(key => config[key] === true && delete config[key])
 
+    // 只要是设置了
     Object.keys(config).forEach(key => {
-      if (Object.keys(accept).indexOf(key) > -1) return
+      if (
+        Object.keys(accept).indexOf(key) > -1 || // 接受字段
+        Object.keys(ignore).indexOf(key) === -1 // 不忽略字段
+      ) return
+
       delete config[key]
     })
 
@@ -192,11 +196,31 @@ module.exports = class MiniProgam {
       subPackages: acceptSubPages = []
     } = accept
 
+    let {
+      pages: ignorePages = []
+    } = ignore
+
     if (!Array.isArray(acceptPages)) acceptPages = pages
     if (!Array.isArray(acceptSubPages)) acceptPages = subPackages.map(({ root }) => root)
 
     config.pages = pages.filter(page => acceptPages.indexOf(page) > -1)
-    config.subPackages = subPackages.filter(({ root }) => acceptSubPages.indexOf(root) > -1)
+
+    const allowSubPackages = []
+
+    subPackages.filter(({ root, pages }) => {
+      let pak = { root, pages: [] }
+      if (acceptSubPages.indexOf(root) > -1) {
+        pages.forEach(page => {
+          if (ignorePages.indexOf(join(root, page)) === -1) {
+            pak.pages.push(page)
+          }
+        })
+
+        allowSubPackages.push(pak)
+      }
+    })
+
+    config.subPackages = allowSubPackages
 
     return config
   }
