@@ -1,5 +1,5 @@
 const { join } = require('path')
-const { getFiles } = require('../utils')
+const { getFiles, getDistPath } = require('../utils')
 const FileTree = require('../FileTree')
 
 let tree = new FileTree()
@@ -24,7 +24,8 @@ function filterPackages (packages, returnTure) {
  * 如果多个入口中有相同 page 则优先处理（第一个）的入口的 page 生效
  * @param {*} entry
  */
-module.exports.reslovePagesFiles = function ({ pages = [], subPackages = [] }, context) {
+module.exports.reslovePagesFiles = function ({ pages = [], subPackages = [] }, context, options = {}) {
+  const { replaceSrc } = options
   const packages = [...subPackages, { root: '', pages }]
 
   const newPages = filterPackages(packages, page => !tree.hasPage(page))
@@ -32,7 +33,27 @@ module.exports.reslovePagesFiles = function ({ pages = [], subPackages = [] }, c
   const result = []
 
   newPages.forEach(({ page, isSubPkg }) => {
-    const files = getFiles(context, page)
+    let replaceFiles = []
+
+    if (replaceSrc && context.endsWith('/src') > -1) {
+      replaceFiles = getFiles(context.replace('src', replaceSrc), page)
+    }
+
+    let files = getFiles(context, page)
+
+    if (replaceFiles.length > 0) {
+      files = files.map(file => {
+        replaceFiles = replaceFiles.filter(rFile => {
+          if (rFile.endsWith(getDistPath(file))) {
+            file = rFile
+            return false
+          }
+          return true
+        })
+
+        return file
+      })
+    }
 
     files.forEach(file => !tree.has(file) && result.push(file))
 

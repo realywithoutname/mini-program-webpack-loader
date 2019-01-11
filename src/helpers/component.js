@@ -66,7 +66,6 @@ async function componentFiles (resolver, request, content, options = {}, normalC
   const handelComponent = async (key, component) => {
     const { replaceSrc } = options
     let replaceFiles = []
-    let hasReplaceFile = false
 
     /**
      * 这里可以优化，如果文件中已经有了依赖列表，则可以直接用，不用异步取
@@ -88,7 +87,6 @@ async function componentFiles (resolver, request, content, options = {}, normalC
           // 如果有相对路径一样的文件
           if (rFile.endsWith(utils.getDistPath(file))) {
             file = rFile // 替换文件
-            hasReplaceFile = true
             return false
           }
           return true
@@ -104,10 +102,6 @@ async function componentFiles (resolver, request, content, options = {}, normalC
     files.forEach(file => {
       if (!tree.has(file)) asserts.push(file)
     })
-
-    if (hasReplaceFile) {
-      console.log('\n替换后的自定义组件的文件 =>\n', files)
-    }
 
     tree.addComponent(request, key, componentPath, files)
 
