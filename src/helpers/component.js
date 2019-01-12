@@ -1,7 +1,7 @@
 const { getFiles, flattenDeep } = require('../utils')
 const { dirname, basename } = require('path')
 const FileTree = require('../FileTree')
-const utils = require('../utils')
+const replaceFiles = require('./replaceFiles')
 
 let tree = new FileTree()
 
@@ -65,7 +65,7 @@ async function componentFiles (resolver, request, content, options = {}, normalC
 
   const handelComponent = async (key, component) => {
     const { replaceSrc } = options
-    let replaceFiles = []
+    let rFiles = []
 
     /**
      * 这里可以优化，如果文件中已经有了依赖列表，则可以直接用，不用异步取
@@ -75,26 +75,10 @@ async function componentFiles (resolver, request, content, options = {}, normalC
     // 获取可能替换的文件
     if (replaceSrc && componentPath.indexOf('/src/') > -1) {
       const replaceComponentPath = componentPath.replace('src', replaceSrc)
-      // const replaceComponentPath = `${componentPath.replace(`src/${distPath}`, '')}${replaceSrc}/${utils.getDistPath(componentPath)}`
-      replaceFiles = getConponentFiles(replaceComponentPath)
+      rFiles = getConponentFiles(replaceComponentPath)
     }
 
-    let files = getConponentFiles(componentPath)
-
-    if (replaceFiles.length > 0) {
-      files = files.map(file => {
-        replaceFiles = replaceFiles.filter(rFile => {
-          // 如果有相对路径一样的文件
-          if (rFile.endsWith(utils.getDistPath(file))) {
-            file = rFile // 替换文件
-            return false
-          }
-          return true
-        })
-
-        return file
-      })
-    }
+    let files = replaceFiles(getConponentFiles(componentPath), rFiles)
 
     /**
      * 这里实际上是不能确定文件是不是成功添加到编译中的

@@ -1,6 +1,7 @@
 const { join } = require('path')
-const { getFiles, getDistPath } = require('../utils')
+const { getFiles } = require('../utils')
 const FileTree = require('../FileTree')
+const replaceFiles = require('./replaceFiles')
 
 let tree = new FileTree()
 
@@ -33,27 +34,13 @@ module.exports.reslovePagesFiles = function ({ pages = [], subPackages = [] }, c
   const result = []
 
   newPages.forEach(({ page, isSubPkg }) => {
-    let replaceFiles = []
+    let rFiles = []
 
     if (replaceSrc && context.endsWith('/src') > -1) {
-      replaceFiles = getFiles(context.replace('src', replaceSrc), page)
+      rFiles = getFiles(context.replace('src', replaceSrc), page)
     }
 
-    let files = getFiles(context, page)
-
-    if (replaceFiles.length > 0) {
-      files = files.map(file => {
-        replaceFiles = replaceFiles.filter(rFile => {
-          if (rFile.endsWith(getDistPath(file))) {
-            file = rFile
-            return false
-          }
-          return true
-        })
-
-        return file
-      })
-    }
+    let files = replaceFiles(getFiles(context, page), rFiles)
 
     files.forEach(file => !tree.has(file) && result.push(file))
 
