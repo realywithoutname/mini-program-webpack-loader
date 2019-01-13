@@ -91,36 +91,34 @@ class MiniLoader {
       this.getDepPath.bind(this)
     )
 
-    return this.addFilesToComplier(assets).then(
-      () => JSON.stringify(json, null, 2)
-    )
+    this.addFilesToComplier(assets)
+    return JSON.stringify(json, null, 2)
   }
 
   addFilesToComplier (files) {
-    let promises = []
+    // let promises = []
 
     /**
      * 怎么速度更快待考证
      */
-    let jsFiles = files.filter(file => {
-      let isJS = /\.js$/.test(file)
+    // let jsFiles = files.filter(file => {
+    //   let isJS = /\.js$/.test(file)
 
-      /**
-       * 非 js 文件直接添加到编译处理
-       */
-      !isJS && promises.push(
-        this.addDepsModule(file)
-      )
+    //   /**
+    //    * 非 js 文件直接添加到编译处理
+    //    */
+    //   !isJS && promises.push(
+    //     this.addDepsModule(file)
+    //   )
 
-      return isJS
-    })
+    //   return isJS
+    // })
 
     /**
-     * 通知插件，下次编译的时候要把这些 js 文件加到编译中，这些文件必须通过插件添加，因为都是入口文件
+     * 通知插件，下次编译的时候要把这些文件加到编译中，这些文件必须通过插件添加，js
+     * 文件必须是入口文件，其他类型文件通过 loadmodule 不能再次被相应
      */
-    jsFiles.length && this.$plugin.newFilesEntryFromLoader(jsFiles)
-
-    return Promise.all(promises)
+    files.length && this.$plugin.newFilesEntryFromLoader(files)
   }
 
   async normalParser (reg) {
