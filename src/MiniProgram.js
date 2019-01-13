@@ -174,50 +174,75 @@ module.exports = class MiniProgam {
     let entryConfig = this.options.entry[entry]
     if (!entryConfig) return config
 
-    let { accept = {}, ignore = {} } = entryConfig
+    let { accept, ignore } = entryConfig
 
     config = JSON.parse(JSON.stringify(config))
 
-    Object.keys(ignore).forEach(key => config[key] === true && delete config[key])
-
     // 只要是设置了
     Object.keys(config).forEach(key => {
-      if (
-        Object.keys(accept).indexOf(key) > -1 || // 接受字段
-        Object.keys(ignore).indexOf(key) === -1 // 不忽略字段
-      ) return
+      if (accept[key]) return // 接受字段
 
       delete config[key]
     })
 
-    const { pages = [], subPackages = [] } = config
     let {
       pages: acceptPages = [],
-      subPackages: acceptSubPages = []
+      subPackages: acceptPkg = []
     } = accept
 
-    let {
-      pages: ignorePages = []
-    } = ignore
+    if (acceptPages !== true && !Array.isArray(acceptPages)) {
+      throw Error('entry.accept.pages 只接受 true 和数组')
+    }
 
-    if (!Array.isArray(acceptPages)) acceptPages = pages
-    if (!Array.isArray(acceptSubPages)) acceptPages = subPackages.map(({ root }) => root)
+    if (acceptPages === true) acceptPages = config.pages
 
-    config.pages = pages.filter(page => acceptPages.indexOf(page) > -1)
+    if (acceptPkg !== true && !Array.isArray(acceptPkg)) {
+      throw Error('entry.accept.subPackages 只接受 true 和数组')
+    }
+
+    let roots = config.subPackages.map(({ root }) => root)
+
+    if (acceptPkg === true) acceptPkg = roots
+
+    config.pages = acceptPages.filter(page => {
+      if (config.pages.indexOf(page) !== -1) return true
+
+      console.log(`page ${page} 在 pages 字段中不存在`.yellow)
+    })
+
+    config.subPackages = acceptPkg.reduce((res, root) => {
+      let index = roots.indexOf(root)
+      if (index === -1) {
+        console.log(`subPackages root ${root} 在 subPackages 字段中不存在`.yellow)
+        return res
+      }
+
+      res.push(
+        config.subPackages[index]
+      )
+
+      return res
+    }, [])
+
+    let { pages: ignorePages = [] } = ignore
+
+    if (!Array.isArray(ignorePages)) {
+      throw Error('entry.ignore.pages 只接受要忽略的 page 数组')
+    }
+
+    config.pages = config.pages.filter(page => ignorePages.indexOf(page) === -1)
 
     const allowSubPackages = []
 
-    subPackages.filter(({ root, pages }) => {
-      let pak = { root, pages: [] }
-      if (acceptSubPages.indexOf(root) > -1) {
-        pages.forEach(page => {
-          if (ignorePages.indexOf(join(root, page)) === -1) {
-            pak.pages.push(page)
-          }
-        })
+    config.subPackages.forEach(({ root, pages }) => {
+      let pkg = { root, pages: [] }
+      pages.forEach(page => {
+        if (ignorePages.indexOf(join(root, page)) === -1) {
+          pkg.pages.push(page)
+        }
+      })
 
-        allowSubPackages.push(pak)
-      }
+      allowSubPackages.push(pkg)
     })
 
     config.subPackages = allowSubPackages
