@@ -197,7 +197,8 @@ class MiniPlugin extends MiniProgam {
      * 检查一些 js 文件路径
      */
     for (const file in assets) {
-      const { replaceSrc } = this.options
+      const { replaceFile } = this.options
+
       let tempFile = utils.getDistPath(file)
 
       if (tempFile !== file) {
@@ -205,9 +206,12 @@ class MiniPlugin extends MiniProgam {
         delete assets[file]
       }
 
-      if (replaceSrc && file.indexOf(replaceSrc) > -1) {
-        assets[file.split(`${replaceSrc}/`)[1]] = assets[file]
-        delete assets[file]
+      if (assets[file] && Array.isArray(replaceFile) && typeof replaceFile[1] === 'function') {
+        const rFile = replaceFile[1](file)
+        if (rFile !== file) {
+          assets[utils.getDistPath(rFile)] = assets[file]
+          delete assets[file]
+        }
       }
 
       if (ignoreEntrys.indexOf(file) > -1 || /node_modules/.test(file)) {

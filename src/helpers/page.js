@@ -1,7 +1,6 @@
 const { join } = require('path')
 const { getFiles } = require('../utils')
 const FileTree = require('../FileTree')
-const replaceFiles = require('./replaceFiles')
 
 let tree = new FileTree()
 
@@ -26,7 +25,7 @@ function filterPackages (packages, returnTure) {
  * @param {*} entry
  */
 module.exports.reslovePagesFiles = function ({ pages = [], subPackages = [] }, context, options = {}) {
-  const { replaceSrc } = options
+  const { replaceFile } = options
   const packages = [...subPackages, { root: '', pages }]
 
   const newPages = filterPackages(packages, page => !tree.hasPage(page))
@@ -34,13 +33,11 @@ module.exports.reslovePagesFiles = function ({ pages = [], subPackages = [] }, c
   const result = []
 
   newPages.forEach(({ page, isSubPkg }) => {
-    let rFiles = []
+    let files = getFiles(context, page)
 
-    if (replaceSrc && context.endsWith('/src') > -1) {
-      rFiles = getFiles(context.replace('src', replaceSrc), page)
+    if (Array.isArray(replaceFile) && typeof replaceFile[0] === 'function') {
+      files = files.map(replaceFile[0])
     }
-
-    let files = replaceFiles(getFiles(context, page), rFiles)
 
     files.forEach(file => !tree.has(file) && result.push(file))
 

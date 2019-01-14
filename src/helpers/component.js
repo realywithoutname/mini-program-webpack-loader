@@ -1,7 +1,6 @@
 const { getFiles, flattenDeep } = require('../utils')
 const { dirname, basename } = require('path')
 const FileTree = require('../FileTree')
-const replaceFiles = require('./replaceFiles')
 
 let tree = new FileTree()
 
@@ -64,21 +63,25 @@ async function componentFiles (resolver, request, content, options = {}, normalC
   let asserts = []
 
   const handelComponent = async (key, component) => {
-    const { replaceSrc } = options
-    let rFiles = []
+    const { replaceFile } = options
+    // let rFiles = []
 
     /**
      * 这里可以优化，如果文件中已经有了依赖列表，则可以直接用，不用异步取
      */
     let componentPath = await resolveComponent(resolver, context, component)
 
-    // 获取可能替换的文件
-    if (replaceSrc && componentPath.indexOf('/src/') > -1) {
-      const replaceComponentPath = componentPath.replace('src', replaceSrc)
-      rFiles = getConponentFiles(replaceComponentPath)
-    }
+    // // 获取可能替换的文件
+    // if (replaceSrc && componentPath.indexOf('/src/') > -1) {
+    //   const replaceComponentPath = componentPath.replace('src', replaceSrc)
+    //   rFiles = getConponentFiles(replaceComponentPath)
+    // }
 
-    let files = replaceFiles(getConponentFiles(componentPath), rFiles)
+    let files = getConponentFiles(componentPath)
+
+    if (Array.isArray(replaceFile) && typeof replaceFile[0] === 'function') {
+      files = files.map(replaceFile[0])
+    }
 
     /**
      * 这里实际上是不能确定文件是不是成功添加到编译中的
