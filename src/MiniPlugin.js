@@ -269,11 +269,15 @@ class MiniPlugin extends MiniProgam {
    * @param {*} stat
    */
   messageOutPut (err, stat) {
-    const { hash, startTime, endTime } = stat
+    if (err) {
+      return console.log('\n', err)
+    }
 
     stat = stat || {
       compilation: {}
     }
+
+    const { hash, startTime, endTime } = stat
 
     const {
       warnings = [],
