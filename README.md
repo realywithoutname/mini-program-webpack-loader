@@ -14,32 +14,124 @@
 - 旧项目太大，想要使用新工具成本太高
 
 ### 插件
-- MiniPlugin
-  - 参数
-    - extfile
-      - `true` 打包主包下的 ext.json(默认值)
-      - `false` 不打包 ext.json
-      - `string` extfile 文件路径
-  
-    - commonSubPackages
-      - Boolean 自动把 subpackages 中子包独自使用的 js 文件打包到子包内。默认值为 `true`
-
-    - analyze
-      - Boolean 输出模块分析
-
-    - resources
-      - Array 提供资源的目录。除了所有入口所在的目录，src目录，node_modules，其他目录需要在这里添加否则可能导致路径计算错误。  
-      如 `path/to/src/app.js`(app.js 与 app.json 同级) 依赖了一个 `path/to/common/base.js` 如果希望 `base.js` 被打包到与 `app.js` 同级的目录，  
-      则必须设置 `resources: ['path/to/common']`。主要为了解决多个项目依赖一个非 node_modules 的公用自定义组件。
-    
-    - entry 
-      - Object 对入口文件进行配置。key 为 webpack entry 配置的对应值。value 可选 ignore 和 accept。ignore 对象的属性值可以是 true 或者具体要 ignore 的内容
 
 插件主要做了以下几件事情：
-- 小程序项目的 Page 文件加载
+- 小程序项目依赖加载
 - 多个小程序项目的合并打包
 - 文件输出路径计算
 - 输出支持小程序的模板
+- 支持全局注册自定义组件
+
+#### 参数
+<table>
+  <tbody>
+    <tr>
+      <td rowspan="3">extfile</td>
+      <td colspan="1">`true`</td>
+      <td colspan="1">打包主包下的 ext.json(默认值)</td>
+    </tr>
+    <tr>
+      <td>`false`</td>
+      <td>
+        不打包 ext.json
+      </td>
+    </tr>
+    <tr>
+      <td>`String`</td>
+      <td>
+        extfile 文件路径
+      </td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <p>commonSubPackages</p>
+      </td>
+      <td colspan="1">`Boolean`</td>
+      <td colspan="1">
+        <p>自动把 subpackages 中子包独自使用的 js 文件打包到子包内。默认值为
+          <span style="color: #ce9178;" data-mce-style="color: #ce9178;">`true`</span></p>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <p>resources</p>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">`Array`</td>
+      <td colspan="1">
+        <p>提供资源的目录。</p>
+        <p>除了所有入口所在的目录，src目录，node_modules，其他目录需要在这里添加否则可能导致路径计算错误。</p>
+        <p>
+          <br>如
+          <span style="color: #ce9178;" data-mce-style="color: #ce9178;">`path/to/src/pages/one/index.json`</span>依赖了一个绝对路径
+          <span style="color: #ce9178;" data-mce-style="color: #ce9178;">`
+            <span style="color: #ce9178;" data-mce-style="color: #ce9178;">path/to/shared/conponents/List/index.json</span>`
+            <span style="color: rgb(0, 51, 102);">。</span></span>
+        </p>
+        <p>其中
+          <span style="color: #ce9178;" data-mce-style="color: #ce9178;">`path/to/src`</span>为项目目录，
+          <span style="color: #ce9178;" data-mce-style="color: #ce9178;">`path/to/shared`</span>
+          <span></span>为多个项目公用的目录。</p>
+        <p>
+          <br>则必须设置
+          <span style="color: #ce9178;" data-mce-style="color: #ce9178;">`resources: ['path/to/shared']`</span>。则最终打包会把
+          <span style="color: #ce9178;" data-mce-style="color: #ce9178;">path/to/shared/conponents 和
+            <span style="color: #ce9178;" data-mce-style="color: #ce9178;">path/to/src/pages 输出到同级目录。</span></span>
+        </p>
+        <br data-mce-bogus="1"></td>
+    </tr>
+    <tr>
+      <td colspan="1">entry</td>
+      <td colspan="1">`Object`</td>
+      <td colspan="1">每个 key 必须为 webpack 对应的 entry 配置的绝对路径。值为一个对象。</td></tr>
+    <tr>
+      <td colspan="1">
+        <span>`entry.accept`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">
+        <span>`Object`</span>
+        <br></td>
+      <td colspan="1">
+        <p>accept 会从对应的入口配置中读取对应的字段，进行保留。即如果 entry 中设置了入口文件配置，则不在 accept 中的字段，都会被直接删除。</p>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <span>`entry.ignore`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">`Object`</td>
+      <td colspan="1">
+        <p>ignore 配置用于删除通过 accept 保留的配置。目前仅支持 pages。</p>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <span>`entry.ignore.pages`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">
+        <span>`Array`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">可以删除 pages 和 subpackages 里面的页面</td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <span>`compilationFinish`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">
+        <span>`Function`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">打包完成后回调</td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <span>`forPlugin`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">
+        <span>`Boolean`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">以插件方式构建，入口文件和普通 app.json 一致</td>
+    </tr>
+  </tbody>
+</table>
 
 #### 文件加载
 1. 加载单个入口所有的 pages 对应 wxml,wxss,json,js,scss 文件
@@ -63,6 +155,9 @@
 1. 如果是相对路径，会以当前打包环境目录（即 webpack context）的 src 目录为目标，计算出真实路径。
 2. 根据真实路径，对所有入口文件所在目录进行匹配，如果是某个目录下的文件则以该目录为目标计算相对路径。
 3. 匹配 node_modules，以 node_modules 后的路径为相对路径。
+
+#### 全局注册自定义组件
+在 app.json 中使用 `usingComponents` 定义全局自定义组件，插件在输出时会自动进行注册到页面或者组件的 json 文件内。（微信支持的全局注册会导致包变大，不建议直接使用）
 
 ### Loader
 - mini-loader 
@@ -95,6 +190,3 @@ loader 主要做了以下几件事情：
       border: $border solid #000;
     }
   ~~~
-
-### 可能存在 bug
-1. 多个项目，入口文件都是 app.json 可能导致 wxss 合并不对

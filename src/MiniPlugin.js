@@ -245,7 +245,7 @@ class MiniPlugin extends MiniProgam {
         chunks: 'initial',
         minSize: 0,
         minChunks: 1,
-        test: module => this.moduleOnlyUsedBySubPackage(module, root),
+        test: module => this.moduleOnlyUsedBySubPackage(module, root + '/'),
         priority: 3
       }
     }
