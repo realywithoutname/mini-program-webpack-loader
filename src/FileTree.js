@@ -136,7 +136,7 @@ class FileTree {
   /**
    * @param {*} pagePath
    * @param {*} pageFiles
-   * @param {*} isSubPkg
+   * @param {*} inSubPkg
    */
   addPage (pagePath, pageFiles, inSubPkg) {
     let pagesMap = this.pages
@@ -318,5 +318,7 @@ class FileTree {
     return wxs
   }
 }
+
+FileTree._tree = null
 
 module.exports = FileTree

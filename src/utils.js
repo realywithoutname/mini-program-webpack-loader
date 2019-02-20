@@ -8,22 +8,24 @@ const {
 /**
  * 计算文件输出路径
  */
-let sourceSet = []
-let outputPath = ''
-let compilerContext = process.cwd()
+// let sourceSet = []
+// let outputPath = ''
+// let compilerContext = process.cwd()
+let $plugin = null
 
-exports.setDistParams = function (context, entryContexts = [], resources = [], outPath) {
-  /**
-   * 项目依赖的目录列表，会根据这些目录计算出最后输出路径
-   */
-  sourceSet = new Set([context, ...resources])
+exports.setDistParams = function (context, entryContexts = [], resources = [], outPath, plugin) {
+//   /**
+//    * 项目依赖的目录列表，会根据这些目录计算出最后输出路径
+//    */
+//   sourceSet = new Set([context, ...resources])
 
-  entryContexts.forEach(entry => sourceSet.add(dirname(entry)))
+  //   entryContexts.forEach(entry => sourceSet.add(dirname(entry)))
 
-  sourceSet = Array.from(sourceSet)
+  //   sourceSet = Array.from(sourceSet)
 
-  outputPath = outPath
-  compilerContext = context
+  //   outputPath = outPath
+  //   compilerContext = context
+  $plugin = plugin
 }
 
 exports.camelCase = (str) => {
@@ -36,47 +38,49 @@ exports.camelCase = (str) => {
 }
 
 exports.getDistPath = function (path) {
-  let fullPath = compilerContext
-  let npmReg = /node_modules/g
+  return $plugin.getDistPath(path)
 
-  if (path === outputPath) return path
+  // let fullPath = compilerContext
+  // let npmReg = /node_modules/g
 
-  path = path.replace(/(\.\.\/)?/g, ($1) => $1 ? '_/' : '')
+  // if (path === outputPath) return path
 
-  if (isAbsolute(path)) {
-    fullPath = path
-  } else {
-    // 相对路径：webpack 最好生成的路径，打包入口外的文件都以 '_' 表示上级目录
-    let pDirReg = /_\//g
+  // path = path.replace(/(\.\.\/)?/g, ($1) => $1 ? '_/' : '')
 
-    while (pDirReg.test(path)) {
-      path = path.substr(pDirReg.lastIndex)
-      pDirReg.lastIndex = 0
-      fullPath = join(fullPath, '../')
-    }
+  // if (isAbsolute(path)) {
+  //   fullPath = path
+  // } else {
+  //   // 相对路径：webpack 最好生成的路径，打包入口外的文件都以 '_' 表示上级目录
+  //   let pDirReg = /_\//g
 
-    if (fullPath !== compilerContext) {
-      fullPath = join(fullPath, path)
-    }
-  }
+  //   while (pDirReg.test(path)) {
+  //     path = path.substr(pDirReg.lastIndex)
+  //     pDirReg.lastIndex = 0
+  //     fullPath = join(fullPath, '../')
+  //   }
 
-  // 根据 entry 中定义的 json 文件目录获取打包后所在目录，如果不能获取就返回原路径
-  let contextReg = new RegExp(sourceSet.join('|'), 'g')
-  if (fullPath !== compilerContext && contextReg.exec(fullPath)) {
-    path = fullPath.substr(contextReg.lastIndex + 1)
-    console.assert(!npmReg.test(path), `文件${path}路径错误：不应该还包含 node_modules`)
-  }
+  //   if (fullPath !== compilerContext) {
+  //     fullPath = join(fullPath, path)
+  //   }
+  // }
 
-  /**
-   * 如果有 node_modules 字符串，则去模块名称
-   * 如果 app.json 在 node_modules 中，那 path 不应该包含 node_modules
-   */
+  // // 根据 entry 中定义的 json 文件目录获取打包后所在目录，如果不能获取就返回原路径
+  // let contextReg = new RegExp(sourceSet.join('|'), 'g')
+  // if (fullPath !== compilerContext && contextReg.exec(fullPath)) {
+  //   path = fullPath.substr(contextReg.lastIndex + 1)
+  //   console.assert(!npmReg.test(path), `文件${path}路径错误：不应该还包含 node_modules`)
+  // }
 
-  if (npmReg.test(path)) {
-    path = path.substr(npmReg.lastIndex + 1)
-  }
+  // /**
+  //  * 如果有 node_modules 字符串，则去模块名称
+  //  * 如果 app.json 在 node_modules 中，那 path 不应该包含 node_modules
+  //  */
 
-  return path
+  // if (npmReg.test(path)) {
+  //   path = path.substr(npmReg.lastIndex + 1)
+  // }
+
+  // return path
 }
 
 /**
@@ -160,6 +164,90 @@ exports.formatEntry = (context = process.cwd(), entry = [], chunkNames = []) => 
   if (!miniEntrys.length) throw new Error('找不到一个有效的入口文件')
 
   return miniEntrys
+}
+
+exports.formatSource = function (entryContexts = [], resources = []) {
+  /**
+   * 项目依赖的目录列表，会根据这些目录计算出最后输出路径
+   */
+  const entryDirs = entryContexts.map(entry => dirname(entry))
+  const sourceSet = new Set([...entryDirs, ...resources])
+  const sources = Array.from(sourceSet)
+  /**
+   * 资源目录排序
+   * [
+   *  'path/to/src/',
+   *  'path/to/src1/',
+   *  'path/to/src/dir1',
+   *  'path/to/src/dir2',
+   *  'path/to/src/dir1/333',
+   *  'path/to/src/dir2/333',
+   * ]
+   *    =>
+   * [
+   *  'path/to/src/dir1/333',
+   *  'path/to/src/dir1',
+   *  'path/to/src/dir2/333',
+   *  'path/to/src/dir2',
+   *  'path/to/src1/',
+   *  'path/to/src/'
+   * ]
+   */
+
+  /**
+   * {
+   *   path: {
+   *     isEndPoint: false,
+   *     to: {
+   *       isEndPoint: false,
+   *       src: {
+   *         isEndPoint: true,
+   *       },
+   *       src1: {
+   *         isEndPoint: true,
+   *       },
+   *     }
+   *   }
+   * }
+   */
+  const tree = {}
+
+  sources.forEach((source, index) => {
+    let parent = tree
+    let splited = source.split('/')
+    splited.forEach((val, index) => {
+      if (val === '') val = '/'
+
+      const child = parent[val] || { isEndPoint: index === splited.length - 1 }
+      parent = parent[val] = child
+    })
+  })
+
+  function resolvePath (tree, key) {
+    let keys = Object.keys(tree)
+
+    let paths = []
+
+    keys.forEach(key => {
+      if (key === 'isEndPoint') return
+
+      let res = resolvePath(tree[key], key)
+      if (res.length === 0) {
+        res = [key]
+      } else {
+        res = res.map(item => join(key, item))
+      }
+      paths = paths.concat(res)
+    })
+
+    if (tree.isEndPoint) {
+      paths.push('')
+    }
+
+    return paths
+  }
+
+  return resolvePath(tree)
 }
 
 exports.relative = (from, to) => {

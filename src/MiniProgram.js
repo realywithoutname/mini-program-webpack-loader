@@ -3,7 +3,8 @@ const {
   dirname,
   join,
   extname,
-  basename
+  basename,
+  isAbsolute
 } = require('path')
 const utils = require('./utils')
 const AliPluginHelper = require('./ali/plugin')
@@ -79,7 +80,9 @@ module.exports = class MiniProgam {
     this.miniEntrys = utils.formatEntry(compiler.context, compiler.options.entry, this.chunkNames)
 
     // 设置计算打包后路径需要的参数（在很多地方需要使用）
-    utils.setDistParams(this.compilerContext, this.miniEntrys, this.options.resources, this.outputPath)
+    utils.setDistParams(this.compilerContext, this.miniEntrys, this.options.resources, this.outputPath, this)
+    // 资源路径集合
+    this.sourceSet = utils.formatSource(this.miniEntrys, this.options.resources)
   }
 
   getGlobalComponents () {
@@ -140,6 +143,51 @@ module.exports = class MiniProgam {
     )
 
     return entryNames
+  }
+
+  getDistPath (path) {
+    const compilerContext = this.compilerContext
+    let fullPath = compilerContext
+    let npmReg = /node_modules/g
+
+    if (path === this.outputPath) return path
+
+    path = path.replace(/(\.\.\/)?/g, ($1) => $1 ? '_/' : '')
+
+    if (isAbsolute(path)) {
+      fullPath = path
+    } else {
+      // 相对路径：webpack 最好生成的路径，打包入口外的文件都以 '_' 表示上级目录
+      let pDirReg = /_\//g
+
+      while (pDirReg.test(path)) {
+        path = path.substr(pDirReg.lastIndex)
+        pDirReg.lastIndex = 0
+        fullPath = join(fullPath, '../')
+      }
+
+      if (fullPath !== compilerContext) {
+        fullPath = join(fullPath, path)
+      }
+    }
+
+    // 根据 entry 中定义的 json 文件目录获取打包后所在目录，如果不能获取就返回原路径
+    let contextReg = new RegExp(this.sourceSet.join('|'), 'g')
+    if (fullPath !== compilerContext && contextReg.exec(fullPath)) {
+      path = fullPath.substr(contextReg.lastIndex + 1)
+      console.assert(!npmReg.test(path), `文件${path}路径错误：不应该还包含 node_modules`)
+    }
+
+    /**
+     * 如果有 node_modules 字符串，则去模块名称
+     * 如果 app.json 在 node_modules 中，那 path 不应该包含 node_modules
+     */
+
+    if (npmReg.test(path)) {
+      path = path.substr(npmReg.lastIndex + 1)
+    }
+
+    return path
   }
 
   addEntrys (context, files) {
@@ -295,9 +343,9 @@ module.exports = class MiniProgam {
       this.addEntrys(itemContext, [pageFiles, entryFiles, entryPath])
 
       this.fileTree.setFile(entryFiles, true /* ignore */)
-      this.fileTree.addEntry(entryPath)
+      this.fileTree.addEntry(entryPath);
 
-      config.usingComponents && pageFiles.push(entryPath)
+      (config.usingComponents || config.publicComponents) && pageFiles.push(entryPath)
 
       componentFiles[itemContext] = (componentFiles[itemContext] || []).concat(
         pageFiles.filter((file) => this.fileTree.getFile(file).isJson)

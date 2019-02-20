@@ -8,6 +8,7 @@ const { util: { createHash } } = require('webpack')
 const utils = require('./utils')
 const MiniProgam = require('./MiniProgram')
 const { get: getAppJson } = require('./helpers/app')
+const { toTargetPath } = require('./helpers/path')
 const stdout = process.stdout
 
 const DEPS_MAP = {}
@@ -61,7 +62,7 @@ class MiniPlugin extends MiniProgam {
    * @param {String} path 文件的绝对路径
    */
   getAesstPathHook (path) {
-    return utils.getDistPath(path)
+    return this.getDistPath(path)
   }
 
   /**
@@ -101,7 +102,7 @@ class MiniPlugin extends MiniProgam {
 
       assetsKey.forEach(key => {
         const source = assets[key]
-        const fileMeta = this.fileTree.getFileByDist(utils.getDistPath(key), true)
+        const fileMeta = this.fileTree.getFileByDist(this.getDistPath(key))
 
         if (ignoreFiles.indexOf(key) > -1) return
 
@@ -132,12 +133,12 @@ class MiniPlugin extends MiniProgam {
     compilation.hooks.optimizeChunks.tap('MiniPlugin', chunks => {
       let ignoreEntrys = this.getIgnoreEntrys()
       for (const chunk of chunks) {
-        if (chunk.hasEntryModule() && !ignoreEntrys.indexOf(chunk.name) !== 0) {
+        if (chunk.hasEntryModule() && !(ignoreEntrys.indexOf(chunk.name) !== -1)) {
           // 记录模块之间依赖关系
           for (const module of chunk.getModules()) {
             if (!module.isEntryModule()) {
               const resourcePath = module.resource
-              let relPath = utils.getDistPath(resourcePath)
+              let relPath = this.getDistPath(resourcePath)
               let chunkName = chunk.name + '.js'
               utils.setMapValue(DEPS_MAP, relPath, chunkName)
 
@@ -197,7 +198,7 @@ class MiniPlugin extends MiniProgam {
      * 检查一些 js 文件路径
      */
     for (const file in assets) {
-      let tempFile = utils.getDistPath(file)
+      let tempFile = this.getDistPath(file)
 
       if (tempFile !== file) {
         assets[tempFile] = assets[file]
@@ -251,7 +252,7 @@ class MiniPlugin extends MiniProgam {
 
   /**
    * 输出打包进度
-   * @param {String} progress 进度
+   * @param {Number} progress 进度
    * @param {String} event
    * @param {*} modules
    */
@@ -261,6 +262,29 @@ class MiniPlugin extends MiniProgam {
 
     if (+progress === 1) return
     stdout.write(`${'正在打包: '.gray} ${`${(progress * 100).toFixed(2)}%`.green} ${event || ''} ${modules || ''}`)
+  }
+
+  getAssetContent (file) {
+    let distPath = this.getDistPath(file)
+    let { assets, cache } = this.compiler.compilation
+
+    distPath = toTargetPath(distPath)
+
+    if (assets[distPath]) return assets[distPath].source().toString()
+
+    for (const key in cache) {
+      if (cache.hasOwnProperty(key)) {
+        const module = cache[key]
+
+        if (module.buildInfo && module.buildInfo.assets) {
+          for (const assetName of Object.keys(module.buildInfo.assets)) {
+            if (module.resource === file) {
+              return module.buildInfo.assets[assetName].source().toString()
+            }
+          }
+        }
+      }
+    }
   }
 
   /**
