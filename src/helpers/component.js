@@ -35,6 +35,8 @@ function forEachComponentGenerics (componentGenerics, fn) {
       for (const _key in componentGenerics[key]) {
         ps.push(fn(_key, key))
       }
+    } else if (componentGenerics[key]) {
+      fn(key, key)
     }
   }
 
@@ -75,7 +77,6 @@ async function componentFiles (resolver, request, content, normalCallBack, gener
     files.forEach(file => {
       if (!tree.has(file)) asserts.push(file)
     })
-
     tree.addComponent(request, key, componentPath, files)
 
     return componentPath
@@ -93,7 +94,11 @@ async function componentFiles (resolver, request, content, normalCallBack, gener
    * 抽象组件
    */
   let genericesPromises = forEachComponentGenerics(componentGenerics, async (key, element) => {
-    let componentPath = await handelComponent(key, componentGenerics[element][key])
+    if (componentGenerics[element] === true) {
+      return tree.addComponent(request, element, '', [])
+    }
+
+    let componentPath = await handelComponent(element, componentGenerics[element][key])
 
     genericsCallBack && genericsCallBack(componentPath, key, componentGenerics[element])
   })
