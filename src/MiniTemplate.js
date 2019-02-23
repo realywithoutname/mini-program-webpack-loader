@@ -22,6 +22,12 @@ module.exports = class MiniTemplate {
   }
 
   getRequirePath (entry) {
+    const { replaceFile } = this.$plugin.options
+
+    if (Array.isArray(replaceFile) && typeof replaceFile[1] === 'function') {
+      entry = replaceFile[1](entry)
+    }
+
     let entryPath = join(this.outPath, utils.getDistPath(entry))
     return utils.relative(entryPath, this.requirePath)
   }
@@ -69,12 +75,19 @@ module.exports = class MiniTemplate {
   }
 
   getDepModules (chunk) {
+    const { replaceFile } = this.$plugin.options
     let groups = chunk.groupsIterable
     let modules = new Set()
 
     if (chunk.hasEntryModule()) {
       // 当前 chunk 最后被打包的位置
-      let file = utils.getDistPath(`${chunk.name}.js`)
+      let jsFilePath = `${chunk.name}.js`
+
+      if (Array.isArray(replaceFile) && typeof replaceFile[1] === 'function') {
+        jsFilePath = replaceFile[1](jsFilePath)
+      }
+
+      let file = utils.getDistPath(jsFilePath)
 
       for (const chunkGroup of groups) {
         for (const { name } of chunkGroup.chunks) {

@@ -218,7 +218,7 @@ module.exports = class MiniProgam {
       /**
        * 添加页面
        */
-      let pageFiles = reslovePagesFiles(config, itemContext)
+      let pageFiles = reslovePagesFiles(config, itemContext, this.options)
 
       /**
        * 入口文件只打包对应的 wxss 文件
@@ -266,7 +266,8 @@ module.exports = class MiniProgam {
           return resolveComponentsFiles(
             this.resolver,
             componentFiles[context],
-            componentSet
+            componentSet,
+            this.options
           )
             .then(() => this.addEntrys(context, Array.from(componentSet)))
         })

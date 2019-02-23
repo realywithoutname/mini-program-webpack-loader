@@ -67,7 +67,7 @@ class MiniLoader {
     if (pages.length || subPackages.length) {
       json = await this.$plugin.getEntryConfig(this.fileMeta.source, json)
 
-      let newFiles = reslovePagesFiles(json, this.context)
+      let newFiles = reslovePagesFiles(json, this.context, this.$plugin.options)
 
       await this.addFilesToComplier(newFiles)
 
@@ -88,7 +88,8 @@ class MiniLoader {
       this.resolve,
       this.fileMeta.source,
       json,
-      this.getDepPath.bind(this)
+      this.getDepPath.bind(this),
+      this.$plugin.options
     )
 
     this.addFilesToComplier(assets)

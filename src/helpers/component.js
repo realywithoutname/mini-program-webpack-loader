@@ -54,7 +54,7 @@ function getConponentFiles (absPath) {
   return files
 }
 
-async function componentFiles (resolver, request, content, normalCallBack, genericsCallBack) {
+async function componentFiles (resolver, request, content, options = {}, normalCallBack, genericsCallBack) {
   let context = dirname(request)
   let { componentGenerics, usingComponents, publicComponents } = content
 
@@ -65,11 +65,25 @@ async function componentFiles (resolver, request, content, normalCallBack, gener
   let asserts = []
 
   const handelComponent = async (key, component) => {
+    const { replaceFile } = options
+    // let rFiles = []
+
     /**
      * 这里可以优化，如果文件中已经有了依赖列表，则可以直接用，不用异步取
      */
     let componentPath = await resolveComponent(resolver, context, component)
+
+    // // 获取可能替换的文件
+    // if (replaceSrc && componentPath.indexOf('/src/') > -1) {
+    //   const replaceComponentPath = componentPath.replace('src', replaceSrc)
+    //   rFiles = getConponentFiles(replaceComponentPath)
+    // }
+
     let files = getConponentFiles(componentPath)
+
+    if (Array.isArray(replaceFile) && typeof replaceFile[0] === 'function') {
+      files = files.map(replaceFile[0])
+    }
 
     /**
      * 这里实际上是不能确定文件是不是成功添加到编译中的
@@ -123,10 +137,10 @@ async function componentFiles (resolver, request, content, normalCallBack, gener
 /**
  * 提供给 插件 使用来获取自定义组件或者页面依赖的自定义组件文件列表
  */
-module.exports.resolveFilesForPlugin = async function (resolver, jsonFiles, componentSet) {
+module.exports.resolveFilesForPlugin = async function (resolver, jsonFiles, componentSet, options) {
   for (const request of jsonFiles) {
     const content = require(request)
-    let files = await componentFiles(resolver, request, content)
+    let files = await componentFiles(resolver, request, content, options)
 
     files = flattenDeep(files)
 
@@ -135,7 +149,8 @@ module.exports.resolveFilesForPlugin = async function (resolver, jsonFiles, comp
     await module.exports.resolveFilesForPlugin(
       resolver,
       files.filter(file => tree.getFile(file).isJson),
-      componentSet
+      componentSet,
+      options
     )
   }
 }
@@ -143,7 +158,7 @@ module.exports.resolveFilesForPlugin = async function (resolver, jsonFiles, comp
 /**
  * 提供给 loader 使用来获取自定义组件或者页面依赖的自定义组件文件列表
  */
-module.exports.resolveFilesForLoader = async function (resolver, request, content, getRelativePath) {
+module.exports.resolveFilesForLoader = async function (resolver, request, content, getRelativePath, options) {
   /**
    * 写回组件的相对路径
    * @param {*} componentPath 组件的绝对路径
@@ -159,6 +174,7 @@ module.exports.resolveFilesForLoader = async function (resolver, request, conten
     resolver,
     request,
     content,
+    options,
     setRelComponent,
     setRelComponent
   )

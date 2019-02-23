@@ -24,7 +24,8 @@ function filterPackages (packages, returnTure) {
  * 如果多个入口中有相同 page 则优先处理（第一个）的入口的 page 生效
  * @param {*} entry
  */
-module.exports.reslovePagesFiles = function ({ pages = [], subPackages = [] }, context) {
+module.exports.reslovePagesFiles = function ({ pages = [], subPackages = [] }, context, options = {}) {
+  const { replaceFile } = options
   const packages = [...subPackages, { root: '', pages }]
 
   const newPages = filterPackages(packages, page => !tree.hasPage(page))
@@ -32,7 +33,11 @@ module.exports.reslovePagesFiles = function ({ pages = [], subPackages = [] }, c
   const result = []
 
   newPages.forEach(({ page, isSubPkg }) => {
-    const files = getFiles(context, page)
+    let files = getFiles(context, page)
+
+    if (Array.isArray(replaceFile) && typeof replaceFile[0] === 'function') {
+      files = files.map(replaceFile[0])
+    }
 
     files.forEach(file => !tree.has(file) && result.push(file))
 
