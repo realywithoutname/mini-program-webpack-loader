@@ -1,3 +1,6 @@
+const { join } = require('path')
+const { existsSync } = require('fs')
+
 const appCode = {
   // path: config
 }
@@ -85,4 +88,23 @@ module.exports.get = function () {
   delete code.usingComponents
 
   return code
+}
+
+/**
+ * 获取 icon 路径
+ * @param {*} context
+ * @param {*} tabs
+ */
+module.exports.getTabBarIcons = function (context, tabs) {
+  let files = []
+  for (const tab of tabs) {
+    let file = join(context, tab.iconPath)
+    if (existsSync(file)) files.push(file)
+
+    file = join(context, tab.selectedIconPath)
+
+    if (existsSync(file)) files.push(file)
+  }
+
+  return files
 }

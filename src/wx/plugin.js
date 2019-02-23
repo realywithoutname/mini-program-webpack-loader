@@ -23,6 +23,7 @@ module.exports = class WxPluginHelper {
 
   emitHook (compilation, callback) {
     transXml(compilation, this.$plugin)
+      .then(() => this.$plugin.options.beforeEmit(compilation, this.$plugin))
       .then(() => callback())
       .catch(callback)
   }

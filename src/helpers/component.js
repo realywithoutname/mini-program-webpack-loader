@@ -56,11 +56,11 @@ function getConponentFiles (absPath) {
 
 async function componentFiles (resolver, request, content, normalCallBack, genericsCallBack) {
   let context = dirname(request)
-  let { componentGenerics, usingComponents } = content
+  let { componentGenerics, usingComponents, publicComponents } = content
 
   tree.clearDepComponents(request)
 
-  if (!usingComponents && !componentGenerics) return []
+  if (!usingComponents && !componentGenerics && !publicComponents) return []
 
   let asserts = []
 
@@ -91,6 +91,14 @@ async function componentFiles (resolver, request, content, normalCallBack, gener
   })
 
   /**
+  * 插件组件处理和普通插件处理一样
+  */
+  let pluginPromises = forEachUsingComponent(publicComponents, async (key, item) => {
+    let componentPath = await handelComponent(key, item)
+    normalCallBack && normalCallBack(componentPath, key, publicComponents)
+  })
+
+  /**
    * 抽象组件
    */
   let genericesPromises = forEachComponentGenerics(componentGenerics, async (key, element) => {
@@ -105,6 +113,7 @@ async function componentFiles (resolver, request, content, normalCallBack, gener
 
   await Promise.all([
     ...normalPromises,
+    ...pluginPromises,
     ...genericesPromises
   ])
 

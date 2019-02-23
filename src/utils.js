@@ -16,11 +16,7 @@ exports.setDistParams = function (context, entryContexts = [], resources = [], o
   /**
    * 项目依赖的目录列表，会根据这些目录计算出最后输出路径
    */
-  sourceSet = new Set([context, ...resources])
-
-  entryContexts.forEach(entry => sourceSet.add(dirname(entry)))
-
-  sourceSet = Array.from(sourceSet)
+  sourceSet = exports.formatSource(entryContexts, resources)
 
   outputPath = outPath
   compilerContext = context
@@ -162,9 +158,95 @@ exports.formatEntry = (context = process.cwd(), entry = [], chunkNames = []) => 
   return miniEntrys
 }
 
+/**
+ * 资源目录排序，在计算路径时优先根据子路径计算
+ * [
+ *  'path/to/src/',
+ *  'path/to/src1/',
+ *  'path/to/src/dir1',
+ *  'path/to/src/dir2',
+ *  'path/to/src/dir1/333',
+ *  'path/to/src/dir2/333',
+ * ]
+ *    =>
+ * [
+ *  'path/to/src/dir1/333',
+ *  'path/to/src/dir1',
+ *  'path/to/src/dir2/333',
+ *  'path/to/src/dir2',
+ *  'path/to/src1/',
+ *  'path/to/src/'
+ * ]
+ */
+exports.formatSource = function (entryContexts = [], resources = []) {
+  /**
+   * 项目依赖的目录列表，会根据这些目录计算出最后输出路径
+   */
+  const entryDirs = entryContexts.map(entry => dirname(entry))
+  const sourceSet = new Set([...entryDirs, ...resources])
+  const sources = Array.from(sourceSet)
+
+  /**
+   * {
+   *   path: {
+   *     isEndPoint: false,
+   *     to: {
+   *       isEndPoint: false,
+   *       src: {
+   *         isEndPoint: true,
+   *       },
+   *       src1: {
+   *         isEndPoint: true,
+   *       },
+   *     }
+   *   }
+   * }
+   */
+  const tree = {}
+
+  sources.forEach((source, index) => {
+    let parent = tree
+    let splited = source.split('/')
+    splited.forEach((val, index) => {
+      if (val === '') val = '/'
+
+      const child = parent[val] || { isEndPoint: index === splited.length - 1 }
+      parent = parent[val] = child
+    })
+  })
+
+  function resolvePath (tree, key) {
+    let keys = Object.keys(tree)
+
+    let paths = []
+
+    keys.forEach(key => {
+      if (key === 'isEndPoint') return
+
+      let res = resolvePath(tree[key], key)
+      if (res.length === 0) {
+        res = [key]
+      } else {
+        res = res.map(item => join(key, item))
+      }
+      paths = paths.concat(res)
+    })
+
+    if (tree.isEndPoint) {
+      paths.push('')
+    }
+
+    return paths
+  }
+
+  return resolvePath(tree)
+}
+
 exports.relative = (from, to) => {
   return './' + relative(dirname(from), to)
 }
+
+exports.noop = () => {}
 
 /**
  * 插件中使用的 resolver，获取真实路径
