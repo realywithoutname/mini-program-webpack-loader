@@ -238,7 +238,7 @@ class MiniLoader {
     let outPath = resolveDistPath(this.fileMeta.source)
     let depOutPath = resolveDistPath(dep)
 
-    return './' + utils.relative(outPath, depOutPath)
+    return utils.relative(outPath, depOutPath)
   }
 
   async getAbsolutePath (context, dep) {

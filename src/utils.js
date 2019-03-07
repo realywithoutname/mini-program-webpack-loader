@@ -56,11 +56,17 @@ exports.getDistPath = function (path) {
     }
   }
 
-  // 根据 entry 中定义的 json 文件目录获取打包后所在目录，如果不能获取就返回原路径
-  let contextReg = new RegExp(sourceSet.join('|'), 'g')
-  if (fullPath !== compilerContext && contextReg.exec(fullPath)) {
-    path = fullPath.substr(contextReg.lastIndex + 1)
-    console.assert(!npmReg.test(path), `文件${path}路径错误：不应该还包含 node_modules`)
+  if (fullPath !== compilerContext) {
+    for (let index = 0; index < sourceSet.length; index++) {
+      const source = sourceSet[index]
+      const outPath = relative(source, fullPath)
+
+      if (outPath && outPath.indexOf('..') === -1) {
+        path = outPath
+        console.assert(!npmReg.test(path), `文件${path}路径错误：不应该还包含 node_modules`)
+        break
+      }
+    }
   }
 
   /**
@@ -243,7 +249,7 @@ exports.formatSource = function (entryContexts = [], resources = []) {
 }
 
 exports.relative = (from, to) => {
-  return './' + relative(dirname(from), to)
+  return './' + relative(dirname(from), to).replace(/\\/g, '/')
 }
 
 exports.noop = () => {}

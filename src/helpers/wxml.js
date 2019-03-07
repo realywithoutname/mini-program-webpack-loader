@@ -83,8 +83,8 @@ module.exports = class Xml {
       if (/\.wxs$/.test(source)) {
         source = this.platform === 'ali' ? source.replace(/\.wxs$/, '.sjs') : source
 
-        let originPath = './' + utils.relative(entry, source)
-        let newPath = './' + utils.relative(this.request, source)
+        let originPath = utils.relative(entry, source)
+        let newPath = utils.relative(this.request, source)
 
         content = content.replaceAll(originPath, newPath)
         continue
