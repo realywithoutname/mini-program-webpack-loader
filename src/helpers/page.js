@@ -26,6 +26,12 @@ function filterPackages (packages, returnTure) {
  */
 module.exports.reslovePagesFiles = function ({ pages = [], subPackages = [] }, context, options = {}) {
   const { replaceFile } = options
+
+  // 插件是对象形式的
+  if (!Array.isArray(pages)) {
+    pages = Object.keys(pages).map((key) => pages[key])
+  }
+
   const packages = [...subPackages, { root: '', pages }]
 
   const newPages = filterPackages(packages, page => !tree.hasPage(page))

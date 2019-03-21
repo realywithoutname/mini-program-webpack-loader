@@ -1,7 +1,7 @@
 const {
   ConcatSource
 } = require('webpack-sources')
-const { get: getAppJson } = require('../helpers/app')
+const { get: getAppJson, getPlugin: getPluginJson } = require('../helpers/app')
 const transXml = require('./transxml')
 
 module.exports = class WxPluginHelper {
@@ -15,6 +15,18 @@ module.exports = class WxPluginHelper {
 
   getAppJsonCode () {
     return new ConcatSource(JSON.stringify(getAppJson(), null, 2))
+  }
+
+  getPluginJsonCode () {
+    const { main, pages, publicComponents } = getPluginJson(this.$plugin.mainEntry).config
+
+    return new ConcatSource(
+      JSON.stringify({
+        main,
+        pages,
+        publicComponents
+      }, null, 2)
+    )
   }
 
   getAppJsCode (content) {

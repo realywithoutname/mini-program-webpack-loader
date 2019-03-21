@@ -192,7 +192,7 @@ class MiniPlugin extends MiniProgam {
        */
       assets['app.wxss'] = this.getAppWxss(compilation)
     } else {
-      delete assets['app.json']
+      assets['plugin.json'] = this.helperPlugin.getPluginJsonCode()
     }
 
     /**
@@ -246,16 +246,18 @@ class MiniPlugin extends MiniProgam {
       return
     }
 
-    for (const { root } of appJson.subPackages) {
-      let name = root.replace('/', '')
+    if (appJson.subPackages) {
+      for (const { root } of appJson.subPackages) {
+        let name = root.replace('/', '')
 
-      cachegroups[`${name}Commons`] = {
-        name: `${root}/commonchunks`,
-        chunks: 'initial',
-        minSize: 0,
-        minChunks: 1,
-        test: module => moduleOnlyUsedBySubPackage(module, root + '/'),
-        priority: 3
+        cachegroups[`${name}Commons`] = {
+          name: `${root}/commonchunks`,
+          chunks: 'initial',
+          minSize: 0,
+          minChunks: 1,
+          test: module => moduleOnlyUsedBySubPackage(module, root + '/'),
+          priority: 3
+        }
       }
     }
   }

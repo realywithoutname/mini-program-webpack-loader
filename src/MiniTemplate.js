@@ -13,6 +13,7 @@ module.exports = class MiniTemplate {
   }
   apply (compiler) {
     this.compiler = compiler
+    this.targetIsUMD = compiler.options.output.libraryTarget === 'umd'
 
     compiler.hooks.compilation.tap('MiniTemplate', (compilation) => {
       this.compilation = compilation
@@ -48,8 +49,13 @@ module.exports = class MiniTemplate {
       /**
        * 计算出 webpack-require 相对改 chunk 的路径
        */
-      source.add(`/******/ var webpackRequire = ${globalRequire}("./${this.getRequirePath(chunk.entryModule.resource)}");\n`)
-      source.add(`/******/ webpackRequire(\n`)
+      this.targetIsUMD && source.add('(function() {\n')
+
+      source.add(`var webpackRequire = ${globalRequire}("${this.getRequirePath(chunk.entryModule.resource)}");\n`)
+
+      this.targetIsUMD && source.add('return ')
+
+      source.add(`webpackRequire(\n`)
       source.add(`"${chunk.entryModule.id}",\n`)
       modules.size && source.add('Object.assign(')
 
@@ -68,6 +74,8 @@ module.exports = class MiniTemplate {
       )
       modules.size && source.add(')')
       source.add(')')
+
+      this.targetIsUMD && source.add('\n})()')
       return source
     } catch (error) {
       console.log(error)
