@@ -17,10 +17,6 @@ function forEachUsingComponent (usingComponents, fn) {
   for (const key in usingComponents || {}) {
     let element = usingComponents[key]
 
-    if (/^plugin:\/\//.test(element)) {
-      continue
-    }
-
     ps.push(fn(key, element))
   }
 
@@ -100,6 +96,9 @@ async function componentFiles (resolver, request, content, options = {}, normalC
    * 自定义组件
    */
   let normalPromises = forEachUsingComponent(usingComponents, async (key, item) => {
+    if (/^plugin:\/\//.test(item)) {
+      return tree.addComponent(request, key, '', [])
+    }
     let componentPath = await handelComponent(key, item)
     normalCallBack && normalCallBack(componentPath, key, usingComponents)
   })

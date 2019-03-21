@@ -75,7 +75,7 @@ function parseUsingComponents (acceptUsingComponents = [], ignoreUsingComponents
     delete copyUsingComponents[key]
   })
 
-  config.usingComponents = copyUsingComponents
+  config.usingComponents = Object.keys(copyUsingComponents).length > 0 ? copyUsingComponents : undefined
 }
 
 module.exports.getEntryConfig = async function (pluginEntryConfig, appJsonConfig) {
