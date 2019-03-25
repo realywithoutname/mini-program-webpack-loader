@@ -1,9 +1,16 @@
+const { join } = require('path')
+const { existsSync } = require('fs')
 const appCode = {
   // path: config
 }
 
 module.exports.update = function (config, filePath, isMain) {
-  appCode[filePath] = { config, isMain }
+  const isPlugin = (config.pages && !Array.isArray(config.pages)) || !!config.publicComponents
+  appCode[filePath] = { config, isMain, isPlugin }
+}
+
+module.exports.getPlugin = function (entry) {
+  return appCode[entry]
 }
 
 module.exports.get = function () {
@@ -16,7 +23,9 @@ module.exports.get = function () {
   }
 
   for (const key in appCode) {
-    let { config: appJson, isMain } = appCode[key]
+    let { config: appJson, isMain, isPlugin } = appCode[key]
+    // 如果是插件就直接返回默认数据
+    if (isPlugin) return code
 
     const {
       pages = [],
@@ -85,4 +94,23 @@ module.exports.get = function () {
   delete code.usingComponents
 
   return code
+}
+
+/**
+ * 获取 icon 路径
+ * @param {*} context
+ * @param {*} tabs
+ */
+module.exports.getTabBarIcons = function (context, tabs) {
+  let files = []
+  for (const tab of tabs) {
+    let file = join(context, tab.iconPath)
+    if (existsSync(file)) files.push(file)
+
+    file = join(context, tab.selectedIconPath)
+
+    if (existsSync(file)) files.push(file)
+  }
+
+  return files
 }

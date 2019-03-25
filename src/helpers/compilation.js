@@ -1,5 +1,6 @@
 const utils = require('../utils')
 const { toTargetPath } = require('./path')
+
 module.exports.getAssetContent = function (file, compilation) {
   let distPath = utils.getDistPath(file)
   let { assets, cache } = compilation

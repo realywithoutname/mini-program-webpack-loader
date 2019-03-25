@@ -35,6 +35,8 @@ function forEachComponentGenerics (componentGenerics, fn) {
       for (const _key in componentGenerics[key]) {
         ps.push(fn(_key, key))
       }
+    } else if (componentGenerics[key]) {
+      fn(key, key)
     }
   }
 
@@ -54,11 +56,11 @@ function getConponentFiles (absPath) {
 
 async function componentFiles (resolver, request, content, options = {}, normalCallBack, genericsCallBack) {
   let context = dirname(request)
-  let { componentGenerics, usingComponents } = content
+  let { componentGenerics, usingComponents, publicComponents } = content
 
   tree.clearDepComponents(request)
 
-  if (!usingComponents && !componentGenerics) return []
+  if (!usingComponents && !componentGenerics && !publicComponents) return []
 
   let asserts = []
 
@@ -89,7 +91,6 @@ async function componentFiles (resolver, request, content, options = {}, normalC
     files.forEach(file => {
       if (!tree.has(file)) asserts.push(file)
     })
-
     tree.addComponent(request, key, componentPath, files)
 
     return componentPath
@@ -104,16 +105,29 @@ async function componentFiles (resolver, request, content, options = {}, normalC
   })
 
   /**
+  * 插件组件处理和普通插件处理一样
+  */
+  let pluginPromises = forEachUsingComponent(publicComponents, async (key, item) => {
+    let componentPath = await handelComponent(key, item)
+    normalCallBack && normalCallBack(componentPath, key, publicComponents)
+  })
+
+  /**
    * 抽象组件
    */
   let genericesPromises = forEachComponentGenerics(componentGenerics, async (key, element) => {
-    let componentPath = await handelComponent(key, componentGenerics[element][key])
+    if (componentGenerics[element] === true) {
+      return tree.addComponent(request, element, '', [])
+    }
+
+    let componentPath = await handelComponent(element, componentGenerics[element][key])
 
     genericsCallBack && genericsCallBack(componentPath, key, componentGenerics[element])
   })
 
   await Promise.all([
     ...normalPromises,
+    ...pluginPromises,
     ...genericesPromises
   ])
 

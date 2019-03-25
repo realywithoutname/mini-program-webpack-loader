@@ -8,6 +8,7 @@ const { util: { createHash } } = require('webpack')
 const utils = require('./utils')
 const MiniProgam = require('./MiniProgram')
 const { get: getAppJson } = require('./helpers/app')
+const { pathsInSameFolder, moduleOnlyUsedBySubPackage, pathsInSamePackage } = require('./helpers/module')
 const stdout = process.stdout
 
 const DEPS_MAP = {}
@@ -16,6 +17,14 @@ const ONLY_SUBPACKAGE_USED_MODULE_MAP = {}
 
 class MiniPlugin extends MiniProgam {
   apply (compiler) {
+    if (MiniPlugin.inited) {
+      throw new Error('mini-program-webpack-loader 是一个单例插件，不支持多次实例化')
+    }
+
+    MiniPlugin.inited = true
+
+    this.moduleOnlyUsedBySubPackage = moduleOnlyUsedBySubPackage
+
     super.apply(compiler)
     this._appending = []
 
@@ -183,7 +192,7 @@ class MiniPlugin extends MiniProgam {
        */
       assets['app.wxss'] = this.getAppWxss(compilation)
     } else {
-      delete assets['app.json']
+      assets['plugin.json'] = this.helperPlugin.getPluginJsonCode()
     }
 
     /**
@@ -237,16 +246,18 @@ class MiniPlugin extends MiniProgam {
       return
     }
 
-    for (const { root } of appJson.subPackages) {
-      let name = root.replace('/', '')
+    if (appJson.subPackages) {
+      for (const { root } of appJson.subPackages) {
+        let name = root.replace('/', '')
 
-      cachegroups[`${name}Commons`] = {
-        name: `${root}/commonchunks`,
-        chunks: 'initial',
-        minSize: 0,
-        minChunks: 1,
-        test: module => this.moduleOnlyUsedBySubPackage(module, root + '/'),
-        priority: 3
+        cachegroups[`${name}Commons`] = {
+          name: `${root}/commonchunks`,
+          chunks: 'initial',
+          minSize: 0,
+          minChunks: 1,
+          test: module => moduleOnlyUsedBySubPackage(module, root + '/'),
+          priority: 3
+        }
       }
     }
   }
@@ -279,11 +290,15 @@ class MiniPlugin extends MiniProgam {
    * @param {*} stat
    */
   messageOutPut (err, stat) {
-    const { hash, startTime, endTime } = stat
+    if (err) {
+      return console.log('\n', err)
+    }
 
     stat = stat || {
       compilation: {}
     }
+
+    const { hash, startTime, endTime } = stat
 
     const {
       warnings = [],
@@ -360,13 +375,13 @@ class MiniPlugin extends MiniProgam {
 
       for (const key in COMPONENT_DEPS_MAP) {
         const components = analyzeMap.componentUsed[key] = Array.from(COMPONENT_DEPS_MAP[key])
-        const packageRoot = this.pathsInSamePackage(components)
+        const packageRoot = pathsInSamePackage(components)
 
         // 组件只在子包或者某个目录下的文件中使用，提示
         if (packageRoot) { // 使用组件的文件在同一个子包内
-          let isInPackage = this.pathsInSamePackage([key, components[0]])
+          let isInPackage = pathsInSamePackage([key, components[0]])
           !isInPackage && componentWarnings.push(`自定义组件 ${key.blue} 建议移动到子包 ${packageRoot.red} 内`)
-        } else if (components.length === 1 && !this.pathsInSameFolder([key, ...components])) {
+        } else if (components.length === 1 && !pathsInSameFolder([key, ...components])) {
           // 只有一个页面（组件）使用了该自定义组件
           componentWarnings.push(`自定义组件 ${key.blue} 建议移动到 ${dirname(components[0]).red} 目录内`)
         }

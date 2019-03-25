@@ -4,23 +4,47 @@
 
 支持 node v6 及以上版本
 
+## 安装
+
+``` bash
+  $ npm i mini-program-webpack-loader --dev
+```
+
+## 示例
+
+[小程序插件项目和普通小程序项目打包示例](https://github.com/realywithoutname/mini-loader-plugin-demo)，插件开发可以 clone 该仓库进行开发。
+普通小程序项目可以使用其中的 `build/webpack.comfig.mini.js` 配置来配置自己的项目，也可以直接使用这个仓库作为模板进行开发。
+
 ## 介绍
+
+该工具主要解决小程序难以集成更多的成熟工具的问题。其次支持多个小程序项目共建。
 
 该工具由两部分组成，loader 和 plugin。
 
-该工具主要解决以下问题：
-- 小程序不支持 npm
-- 目录嵌套太深，路劲难以管理
-- 旧项目太大，想要使用新工具成本太高
+### 能力
+- 支持在小程序项目中使用 webpack 的所有能力
+- 支持在 wxml, wxss, wxs, json 文件中使用模块别名
+- 支持全局注册自定义组件
+- 支持多小程序项目合并
+- 支持小程序项目分析
 
 ### 插件
 
-插件主要做了以下几件事情：
-- 小程序项目依赖加载
-- 多个小程序项目的合并打包
-- 文件输出路径计算
-- 输出支持小程序的模板
-- 支持全局注册自定义组件
+#### 使用
+
+``` javascript
+  const MiniPlugin = require('mini-program-webpack-loader').plugin;
+
+  module.exports = {
+    ..., // webpack 其他设置
+    plugins: [
+      new MiniPlugin({
+        ... // 参数
+      })
+    ],
+    ... // webpack 其他设置
+  }
+```
 
 #### 参数
 <table>
@@ -96,6 +120,39 @@
     </tr>
     <tr>
       <td colspan="1">
+        <span>`entry.accept[property]`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">
+        <span>`any`</span>
+        <br></td>
+      <td colspan="1">
+        <p>对于非特殊说明的字段，因为对应入口有了配置就会删除不在 accept 对应中的字段，如果希望保留其中部分字段可以通过设置对应 key 的值为 `true`</p>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <span>`entry.accept.pages`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">
+        <span>`Array` | `true`</span>
+        <br></td>
+      <td colspan="1">
+        <p>如果值是数组，则会从当前入口文件的 `pages` 字段获取对应的页面，其他页面会被丢弃。`true` 值会保留所有的页面，配合 `ignore.pages` 可以丢弃其中部分不用的页面</p>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <span>`entry.accept.usingComponents`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">
+        <span>`Array` | `true`</span>
+        <br></td>
+      <td colspan="1">
+        <p>如果值是数组，元素的值应该是入口文件的 `usingConponents` 字段对应的key，表示要保留的组件，不在数组中的其他组件会被丢弃。`true` 值会保留所有的组件，配合 `ignore.usingComponents` 可以丢弃其中部分不用的组件</p>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="1">
         <span>`entry.ignore`</span>
         <br data-mce-bogus="1"></td>
       <td colspan="1">`Object`</td>
@@ -114,7 +171,25 @@
     </tr>
     <tr>
       <td colspan="1">
-        <span>`compilationFinish`</span>
+        <span>`entry.ignore.usingComponents`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">
+        <span>`Array`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">不加载对应入口文件 `usingConponents` 字段对应组件</td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <span>`beforeEmit(compilation, miniLoader)`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">
+        <span>`Function`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">打包完成，输出到目录前回调，你可以在这里对内容进行最后的修改</td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <span>`compilationFinish(err, stat, appJson)`</span>
         <br data-mce-bogus="1"></td>
       <td colspan="1">
         <span>`Function`</span>
@@ -133,60 +208,76 @@
   </tbody>
 </table>
 
-#### 文件加载
-1. 加载单个入口所有的 pages 对应 wxml,wxss,json,js,scss 文件
-2. 加载单个入口文件名称对应的 wxss 文件
-3. 加载主入口文件名称对应的 js 文件
-4. 加载主入口对应的 project.config.json，ext.json
-5. 加载 TabBar 对应的 icon 文件
-
-#### 合并规则
-1. 以数组中第一个元素为主入口
-2. 结果的 app.json 中 pages 内容为多个入口合并的结果（去重，先后顺序去第一个的位置，后面重复的会被丢弃）
-3. 结果的 app.json 中 subPackages 内容为多个入口合并的结果（不去重）
-4. 结果的 app.json 中 plugins 内容为多个入口合并的结果
-5. 结果的 app.json 中其他属性以入口中顺序取，如果取到值就不会取后面入口内容
-6. 结果的 app.js 内容为主入口对应 js 文件，如果不存在，将打包失败
-7. 结果的 app.wxss 内容为多个入口对应 wxss 文件内容，可以没有相应 wxss 文件
-8. 结果的 project.config.json 内容为主入口所在目录的 project.config.json
-9. 结果的 ext.json 内容为主入口所在目录的 ext.json (extfile 为 true 时生效)
-
-#### 路径计算 - 输出打包后路径
-1. 如果是相对路径，会以当前打包环境目录（即 webpack context）的 src 目录为目标，计算出真实路径。
-2. 根据真实路径，对所有入口文件所在目录进行匹配，如果是某个目录下的文件则以该目录为目标计算相对路径。
-3. 匹配 node_modules，以 node_modules 后的路径为相对路径。
-
-#### 全局注册自定义组件
-在 app.json 中使用 `usingComponents` 定义全局自定义组件，插件在输出时会自动进行注册到页面或者组件的 json 文件内。（微信支持的全局注册会导致包变大，不建议直接使用）
+关于插件的其他介绍可以访问 [这里](https://github.com/realywithoutname/mini-program-webpack-loader/wiki/%E5%85%B3%E4%BA%8E-loader)
 
 ### Loader
-- mini-loader 
+关于 loader 的其他介绍可以访问 [这里](https://github.com/realywithoutname/mini-program-webpack-loader/wiki/%E5%85%B3%E4%BA%8E-loader)
 
-loader 主要做了以下几件事情：
-- 解析 wxss，wxml，wxs 依赖，添加到打包任务（**会对注释中的依赖进行解析，所以不要注释**）
-- 解析 json 中的自定义组件，添加到打包任务
-- 计算依赖的相对路径，回写相对路径到代码
+关于 loader 的配置可以查看 [这个示例](https://github.com/realywithoutname/mini-loader-plugin-demo/blob/master/build/webpack.config.base.loaders.js)
 
-#### loader 能力
-  - 支持 wxss，wxml，wxs 小程序格式文件的转换
-  - 支持 wxss，wxml，wxs 文件中以项目根目录为绝对路径根目录查找依赖（**对老代码支持**）
-  - 支持 wxss，wxml，wxs 中使用 webpack resolve.alias
+### 关于多项目共建
+在这里共建的意思是：多个小程序项目的功能共用。其中包括页面，组件，工具函数的共用。
 
-#### 注意点
-  - app.json（或其他入口）文件在打包过程中添加 page 时，需要先创建对应的文件，否则不会打包新的 page
-  - 为了减小包体积，使用 css 预处理的脚本必须以 `.scss` 结尾，如果同时需要引入其他 wxss 文件，最好在 wxss 文件内 `import` wxss 和 scss
-  - 由于 sass-loader 不支持 resolve.alias，所以 `.scss` 文件必须使用相对路径
-  - 由于 sass-loader 会把 import 的内容直接打包到一个文件，所以不要在 `.scss` 文件中 import `.wxss`
+#### 页面共用
+通过 webpack 的 entry 设置多个 json 配置文件，插件根据这些文件进行解析依赖的页面和组件。对于不需要的配置可以通过插件配置来进行管理。
 
-  使用示例：
-  ~~~ css
-    /* a.wxss */
-    @import "a/b.wxss";
-    @import "a/c.scss"; /* 这里 a/c.scss 将被转换为 a/c.wxss */
+```JavaScript
+  module.exports = {
+    entry: [
+      'path/dir-one/src/app.json',
+      'path/dir-two/src/app.json'
+    ],
+    ...,
+    plugins: [
+      new MiniPlugin({})
+    ],
+    ...
+  }
+```
+在有多个不同的小程序项目，我们称第一个入口为主入口，像 ext.json 这样的文件将从从这个主入口对应的目录进行读取。
 
-    /* a/c.scss 使用 sass-loader 处理后需要使用 file-loader 处理文件名为 [name].wxss */
-    @import "./variables.scss"
-    .class {
-      border: $border solid #000;
+#### 组件共用
+组件共用主要借用 webpack 的 resolve.alias 的能力，在开发中我们只需要在 webpack 配置中设置相应的配置，即可在代码中使用绝对的路径加载文件。
+下面以使用 `path/dir-two` 这个项目中的 `base-component` 组件为例，展示如何在另外个项目中使用它。
+
+``` JavaScript
+  const DIR_TWO = resolve(__dirname, 'DIR_TWO')
+  module.exports = {
+    entry: [
+      'path/dir-one/app.json'
+    ],
+    resolve: {
+      alias: {
+        'project-two': DIR_TWO
+      }
+    },
+    ...,
+    plugins: [
+      new MiniPlugin({
+        // 这个配置即可保证 `dir-two` 目录下的文件正确的输出到希望输出的目录中
+        resources: [
+          DIR_TWO
+        ]
+      })
+    ],
+    ...
+  }
+```
+
+在需要使用这个组件的地方使用即可
+
+``` json
+  {
+    "usingComponents": {
+      "base-component": "project-two/path/to/project-two/index"
     }
-  ~~~
+  }
+```
+
+### 辅助方法
+- `moduleOnlyUsedBySubpackages(module): Boolean` 查询模块是否只在子包中使用
+- `moduleUsedBySubpackage(module, root): Boolean` 查询模块是否在特定子包中使用
+- `moduleOnlyUsedBySubPackage(module, root): Boolean` 查询模块是否只在特定子包使用
+- `pathInSubpackage(path): Boolean` 查询指定路径是否在子包中
+- `getAssetContent(file, compilation): String` 获取某个文件的内容
+- `getAppJson(): Object` 获取最终的 app.json 内容

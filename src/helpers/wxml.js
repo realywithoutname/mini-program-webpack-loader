@@ -80,11 +80,11 @@ module.exports = class Xml {
       // 依赖的文件已经添加不需要再次添加
       if (loaded[source]) continue
 
-      if (this.platform === 'ali' && /\.wxs$/.test(source)) {
-        source = source.replace(/\.wxs$/, '.sjs')
+      if (/\.wxs$/.test(source)) {
+        source = this.platform === 'ali' ? source.replace(/\.wxs$/, '.sjs') : source
 
-        let originPath = './' + utils.relative(entry, source)
-        let newPath = './' + utils.relative(this.request, source)
+        let originPath = utils.relative(entry, source)
+        let newPath = utils.relative(this.request, source)
 
         content = content.replaceAll(originPath, newPath)
         continue
@@ -110,7 +110,15 @@ module.exports = class Xml {
     let request = this.request.replace('.wxml', '.json')
     const compoennts = Xml.getCanUseComponents(this.request)
     const undfnTags = []
-    const jsonCode = JSON.parse(getAssetContent(request, this.compilation))
+    const jsonStr = getAssetContent(request, this.compilation)
+
+    if (!jsonStr) {
+      return this.compilation.errors.push(
+        new Error(`文件${request.red}不存在，或者内容为空`)
+      )
+    }
+
+    const jsonCode = JSON.parse(jsonStr)
 
     const usingComponents = jsonCode.usingComponents = jsonCode.usingComponents || {}
     const genericComponents = Object.keys(jsonCode.componentGenerics || {})
@@ -144,7 +152,7 @@ module.exports = class Xml {
       )
     }
 
-    // COMMENT undfnTags.length && console.log('\n', this.getDistPath(this.request), '中使用了未定义的自定义组件:', Array.from(new Set(undfnTags)).toString().yellow)
+    undfnTags.length && console.log('\n', this.getDistPath(this.request), '中使用了未定义的自定义组件:', Array.from(new Set(undfnTags)).toString().yellow)
   }
 
   formatComponent (handle) {

@@ -19,16 +19,19 @@ const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin')
 
 const {
   flattenDeep,
-  getFiles
+  getFiles,
+  noop
 } = require('./utils')
 const { reslovePagesFiles } = require('./helpers/page')
-const { update: setAppJson, get: getAppJson } = require('./helpers/app')
+const { getEntryConfig } = require('./helpers/entry')
+const { update: setAppJson, get: getAppJson, getTabBarIcons } = require('./helpers/app')
 const { resolveFilesForPlugin: resolveComponentsFiles } = require('./helpers/component')
 const defaultOptions = {
   extfile: true,
   commonSubPackages: true,
   analyze: false,
   resources: [],
+  beforeEmit: noop,
   compilationFinish: null,
   forPlugin: false,
   entry: {
@@ -43,6 +46,8 @@ let mainChunkNameIndex = 0
 
 module.exports = class MiniProgam {
   constructor (options) {
+    global.MINI_PROGRAM_PLUGIN = this
+
     this.chunkNames = ['main']
 
     this.options = Object.assign(
@@ -125,6 +130,10 @@ module.exports = class MiniProgam {
      */
     let entryNames = [...new Set(this.entryNames)]
 
+    if (this.options.forPlugin) {
+      entryNames.splice(entryNames.indexOf('plugin'))
+    }
+
     entryNames = entryNames.map((name) => {
       if (name === 'app') return []
       return ['.json', '.wxss', '.js'].map(ext => name + ext)
@@ -170,84 +179,11 @@ module.exports = class MiniProgam {
     }
   }
 
-  getEntryConfig (entry, config) {
+  async getEntryConfig (entry, config) {
     let entryConfig = this.options.entry[entry]
     if (!entryConfig) return config
 
-    let { accept, ignore } = entryConfig
-
-    config = JSON.parse(JSON.stringify(config))
-
-    // 只要是设置了
-    Object.keys(config).forEach(key => {
-      if (accept[key]) return // 接受字段
-
-      delete config[key]
-    })
-
-    let {
-      pages: acceptPages = [],
-      subPackages: acceptPkg = []
-    } = accept
-
-    if (acceptPages !== true && !Array.isArray(acceptPages)) {
-      throw Error('entry.accept.pages 只接受 true 和数组')
-    }
-
-    if (acceptPages === true) acceptPages = config.pages
-
-    if (acceptPkg !== true && !Array.isArray(acceptPkg)) {
-      throw Error('entry.accept.subPackages 只接受 true 和数组')
-    }
-
-    let roots = config.subPackages.map(({ root }) => root)
-
-    if (acceptPkg === true) acceptPkg = roots
-
-    config.pages = acceptPages.filter(page => {
-      if (config.pages.indexOf(page) !== -1) return true
-
-      console.log(`page ${page} 在 pages 字段中不存在`.yellow)
-    })
-
-    config.subPackages = acceptPkg.reduce((res, root) => {
-      let index = roots.indexOf(root)
-      if (index === -1) {
-        console.log(`subPackages root ${root} 在 subPackages 字段中不存在`.yellow)
-        return res
-      }
-
-      res.push(
-        config.subPackages[index]
-      )
-
-      return res
-    }, [])
-
-    let { pages: ignorePages = [] } = ignore
-
-    if (!Array.isArray(ignorePages)) {
-      throw Error('entry.ignore.pages 只接受要忽略的 page 数组')
-    }
-
-    config.pages = config.pages.filter(page => ignorePages.indexOf(page) === -1)
-
-    const allowSubPackages = []
-
-    config.subPackages.forEach(({ root, pages }) => {
-      let pkg = { root, pages: [] }
-      pages.forEach(page => {
-        if (ignorePages.indexOf(join(root, page)) === -1) {
-          pkg.pages.push(page)
-        }
-      })
-
-      allowSubPackages.push(pkg)
-    })
-
-    config.subPackages = allowSubPackages
-
-    return config
+    return await getEntryConfig(entryConfig, config)
   }
 
   async loadEntrys (entry) {
@@ -275,7 +211,7 @@ module.exports = class MiniProgam {
       /**
        * 获取配置信息，并设置，因为设置分包引用提取，需要先设置好
        */
-      const config = this.getEntryConfig(entryPath, require(entryPath))
+      const config = await this.getEntryConfig(entryPath, require(entryPath))
 
       setAppJson(config, entryPath, entryPath === this.mainEntry)
 
@@ -295,9 +231,9 @@ module.exports = class MiniProgam {
       this.addEntrys(itemContext, [pageFiles, entryFiles, entryPath])
 
       this.fileTree.setFile(entryFiles, true /* ignore */)
-      this.fileTree.addEntry(entryPath)
+      this.fileTree.addEntry(entryPath);
 
-      config.usingComponents && pageFiles.push(entryPath)
+      (config.usingComponents || config.publicComponents) && pageFiles.push(entryPath)
 
       componentFiles[itemContext] = (componentFiles[itemContext] || []).concat(
         pageFiles.filter((file) => this.fileTree.getFile(file).isJson)
@@ -314,7 +250,7 @@ module.exports = class MiniProgam {
     ]
 
     // tabBar icons
-    entrys.concat((tabBar && tabBar.list && this.getTabBarIcons(this.mainContext, tabBar.list)) || [])
+    entrys.concat((tabBar && tabBar.list && getTabBarIcons(this.mainContext, tabBar.list)) || [])
 
     this.fileTree.setFile(
       flattenDeep(entrys)
@@ -336,116 +272,6 @@ module.exports = class MiniProgam {
             .then(() => this.addEntrys(context, Array.from(componentSet)))
         })
     )
-  }
-
-  /**
-   * 获取 icon 路径
-   * @param {*} context
-   * @param {*} tabs
-   */
-  getTabBarIcons (context, tabs) {
-    let files = []
-    for (const tab of tabs) {
-      let file = join(context, tab.iconPath)
-      if (existsSync(file)) files.push(file)
-
-      file = join(context, tab.selectedIconPath)
-
-      if (existsSync(file)) files.push(file)
-    }
-
-    return files
-  }
-
-  moduleOnlyUsedBySubpackages (module) {
-    if (!/\.js$/.test(module.resource) || module.isEntryModule()) return false
-    if (!module._usedModules) throw new Error('非插件提供的 module，不能调用这个方法')
-
-    let { subPackages } = getAppJson()
-    let subRoots = subPackages.map(({ root }) => root) || []
-    let subReg = new RegExp(subRoots.join('|'))
-    let usedFiles = Array.from(module._usedModules)
-
-    return !usedFiles.some(moduleName => !subReg.test(moduleName))
-  }
-
-  moduleUsedBySubpackage (module, root) {
-    if (!/\.js$/.test(module.resource) || module.isEntryModule()) return false
-    if (!module._usedModules) throw new Error('非插件提供的 module，不能调用这个方法')
-
-    let reg = new RegExp(root)
-
-    let usedFiles = Array.from(module._usedModules)
-
-    return usedFiles.some(moduleName => reg.test(moduleName))
-  }
-
-  moduleOnlyUsedBySubPackage (module, root) {
-    if (!/\.js$/.test(module.resource) || module.isEntryModule()) return false
-
-    let usedFiles = module._usedModules
-
-    if (!usedFiles) return false
-
-    let reg = new RegExp(`^${root}`)
-
-    return !Array.from(usedFiles).some(moduleName => !reg.test(moduleName))
-  }
-
-  /**
-   * 判断所给的路径在不在自定义组件内
-   * @param {String} path 任意路径
-   */
-  pathInSubpackage (path) {
-    let { subPackages } = getAppJson()
-
-    for (const { root } of subPackages) {
-      let match = path.match(root)
-
-      if (match !== null && match.index === 0) {
-        return true
-      }
-    }
-
-    return false
-  }
-
-  /**
-   * 判断所给的路径集合是不是在同一个包内
-   * @param {Array} paths 路径列表
-   */
-  pathsInSamePackage (paths) {
-    // 取第一个路径，获取子包 root，然后和其他路径对比
-    let firstPath = paths[0]
-    let root = this.getPathRoot(firstPath)
-
-    // 路径不在子包内
-    if (!root) {
-      return ''
-    }
-
-    let reg = new RegExp(`^${root}`)
-    for (const path of paths) {
-      if (!reg.test(path)) return ''
-    }
-
-    return root
-  }
-
-  /**
-   * 判断列表内数据是不是在同一个目录下
-   * @param {*} paths
-   */
-  pathsInSameFolder (paths) {
-    let firstPath = paths[0]
-    let folder = firstPath.split('/')[0]
-    let reg = new RegExp(`^${folder}`)
-
-    for (const path of paths) {
-      if (!reg.test(path)) return ''
-    }
-
-    return folder
   }
 
   /**
