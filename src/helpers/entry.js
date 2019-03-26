@@ -11,7 +11,7 @@ function parsePackages (acceptPages = [], acceptPkg = [], ignorePages = [], conf
 
   if (acceptPages === true) acceptPages = config.pages
 
-  let roots = config.subPackages.map(({ root }) => root)
+  let roots = (config.subPackages || []).map(({ root }) => root)
 
   if (acceptPkg === true) acceptPkg = roots
 
@@ -79,11 +79,10 @@ function parseUsingComponents (acceptUsingComponents = [], ignoreUsingComponents
 }
 
 module.exports.getEntryConfig = async function (pluginEntryConfig, appJsonConfig) {
-  let entryConfig = pluginEntryConfig
+  const entryConfig = pluginEntryConfig
   if (!entryConfig) return appJsonConfig
 
-  let { accept, ignore } = entryConfig
-
+  const { accept = {}, ignore = {} } = entryConfig
   const config = JSON.parse(JSON.stringify(appJsonConfig))
 
   // 只要是设置了当前入口的配置，所有非 accept 里面的字段都将视为 ignore 字段
