@@ -138,9 +138,9 @@ class FileTree {
    * @param {*} pageFiles
    * @param {*} isSubPkg
    */
-  addPage (pagePath, pageFiles, inSubPkg) {
+  addPage (pagePath, pageFiles, inSubPkg, isIndependent) {
     let pagesMap = this.pages
-    let pageFileSet = this.setFile(pageFiles)
+    let pageFileSet = this.setFile(pageFiles, false, isIndependent)
 
     pagesMap.set(pagePath, {
       isSub: inSubPkg,
@@ -156,10 +156,9 @@ class FileTree {
    * @param {*} componentFiles
    */
   addComponent (file, tag, componentPath, componentFiles) {
-    let componentFileSet = this.setFile(componentFiles)
-
     let fileMap = this.files
-    let { components } = fileMap.get(file)
+    let { components, isIndependent } = fileMap.get(file)
+    let componentFileSet = this.setFile(componentFiles, false, isIndependent)
 
     components.set(tag, componentPath)
 
@@ -199,7 +198,7 @@ class FileTree {
     return this.pages.has(page)
   }
 
-  setFile (files, ignore) {
+  setFile (files, ignore, isIndependent) {
     let fileMap = this.files
     let fileSet = new Set()
 
@@ -213,6 +212,8 @@ class FileTree {
 
       let meta = getFileMeta(file)
       let distFile = this.outputMap[meta.dist]
+
+      meta.isIndependent = isIndependent
 
       // 允许引用不同的 node_modules 下的文件
       if (!ignore && distFile && (!/node_modules/.test(distFile) || !/node_modules/.test(file))) {

@@ -1,4 +1,4 @@
-const { get: getAppJson } = require('./app')
+const { get: getAppJson, getIndependentPages } = require('./app')
 
 module.exports.moduleOnlyUsedBySubpackages = function (module) {
   if (!/\.js$/.test(module.resource) || module.isEntryModule()) return false

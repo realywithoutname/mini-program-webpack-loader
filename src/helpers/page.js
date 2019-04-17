@@ -7,11 +7,11 @@ let tree = new FileTree()
 function filterPackages (packages, returnTure) {
   let result = []
 
-  packages.forEach(({ root, pages }) => {
+  packages.forEach(({ root, pages, independent }) => {
     pages.forEach(page => {
       page = join(root, page)
       if (returnTure(page)) {
-        result.push({ page, isSubPkg: !!root })
+        result.push({ page, isSubPkg: !!root, isIndependent: !!independent })
       }
     })
   })
@@ -38,7 +38,7 @@ module.exports.reslovePagesFiles = function ({ pages = [], subPackages = [] }, c
 
   const result = []
 
-  newPages.forEach(({ page, isSubPkg }) => {
+  newPages.forEach(({ page, isSubPkg, isIndependent }) => {
     let files = getFiles(context, page)
 
     if (Array.isArray(replaceFile) && typeof replaceFile[0] === 'function') {
@@ -47,7 +47,7 @@ module.exports.reslovePagesFiles = function ({ pages = [], subPackages = [] }, c
 
     files.forEach(file => !tree.has(file) && result.push(file))
 
-    tree.addPage(page, files, isSubPkg)
+    tree.addPage(page, files, isSubPkg, isIndependent)
   })
 
   return result
