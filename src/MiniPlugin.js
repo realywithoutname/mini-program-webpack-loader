@@ -60,9 +60,17 @@ class MiniPlugin extends MiniProgam {
     let watch = this.compiler.watch
     let run = this.compiler.run
 
-    this.compiler.watch = options => watch.call(this.compiler, this.compiler.options, this.messageOutPut.bind(this))
-
-    this.compiler.run = () => run.call(this.compiler, this.messageOutPut.bind(this))
+    // 下面两个地方都在使用 thisMessageOutPut, 先存起来
+    const thisMessageOutPut = this.messageOutPut.bind(this);
+    this.compiler.watch = options => watch.call(this.compiler, this.compiler.options, thisMessageOutPut)
+    this.compiler.run = (customFunc) => {
+      return run.call(this.compiler, function(){
+        // 可能有自定义的回调方法，应该继承下
+        customFunc && customFunc.apply(null, arguments)
+        // 按照原有的箭头函数代码，还是返回 messageOutPut 的绑定
+        return thisMessageOutPut.apply(null, arguments)
+      })
+    }
   }
 
   /**
