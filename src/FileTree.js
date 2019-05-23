@@ -273,18 +273,39 @@ class FileTree {
     components.clear()
   }
 
+  // getDepWxmls (file) {
+  //   let wxmls = []
+  //   let depFiles = this.getFile(file).deps
+
+  //   for (const fileMeta of depFiles) {
+  //     wxmls.push(fileMeta.source)
+  //     wxmls = wxmls.concat(
+  //       this.getDepWxmls(fileMeta.source)
+  //     )
+  //   }
+  //   return wxmls
+  // }
+
   get wxmls () {
     let wxmls = []
 
     for (const { files } of this.pages.values()) {
       for (const fileMeta of files) {
-        fileMeta.isWxml && wxmls.push(fileMeta.source)
+        if (fileMeta.isWxml) {
+          wxmls.push(fileMeta.source)
+          // wxmls = wxmls.concat(
+          //   this.getDepWxmls(fileMeta.source)
+          // )
+        }
       }
     }
 
     for (const { files } of this.components.values()) {
       for (const fileMeta of files) {
         fileMeta.isWxml && wxmls.push(fileMeta.source)
+        // wxmls = wxmls.concat(
+        //   this.getDepWxmls(fileMeta.source)
+        // )
       }
     }
 

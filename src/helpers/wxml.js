@@ -25,6 +25,7 @@ module.exports = class Xml {
 
   static find (content, callback) {
     let dom = parseDOM(content, {
+      xmlMode: true,
       recognizeSelfClosing: true,
       lowerCaseAttributeNames: false
     })
@@ -152,7 +153,7 @@ module.exports = class Xml {
       )
     }
 
-    undfnTags.length && console.log('\n', this.getDistPath(this.request), '中使用了未定义的自定义组件:', Array.from(new Set(undfnTags)).toString().yellow)
+    // undfnTags.length && console.log('\n', this.getDistPath(this.request), '中使用了未定义的自定义组件:', Array.from(new Set(undfnTags)).toString().yellow)
   }
 
   formatComponent (handle) {
@@ -183,7 +184,7 @@ module.exports = class Xml {
       handle && handle(componnets, el, componnets.has(name), this.request)
     })
 
-    content = DomUtils.getInnerHTML({ children: dom })
+    content = DomUtils.getInnerHTML({ children: dom }, { xmlMode: true })
 
     tags.length && this.writeToComponent(tags)
 
