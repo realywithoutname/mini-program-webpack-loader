@@ -78,7 +78,7 @@ exports.getDistPath = function (path) {
     path = path.substr(npmReg.lastIndex + 1)
   }
 
-  return path
+  return path.replace(/\\/g, '/')
 }
 
 /**
