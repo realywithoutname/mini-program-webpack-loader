@@ -34,7 +34,7 @@ function forEachComponentGenerics (componentGenerics, fn) {
   return ps
 }
 
-module.exports.resolveComponentsPath = async function (resolver, request) {
+module.exports.resolveComponentsPath = async function resolveComponentsPath (resolver, request) {
   const content = require(request)
   const context = dirname(request)
   const components = new Map()
@@ -50,7 +50,7 @@ module.exports.resolveComponentsPath = async function (resolver, request) {
       components.set(key, {
         request,
         origin: item,
-        absPath: '',
+        absPath: item,
         type: 'plugin'
       })
       return
@@ -83,7 +83,7 @@ module.exports.resolveComponentsPath = async function (resolver, request) {
    */
   let genericesPromises = forEachComponentGenerics(componentGenerics, async (key, element) => {
     if (componentGenerics[element] === true) {
-      return components.set(key, {
+      return components.set(element, {
         request,
         origin: '',
         absPath: '',
@@ -92,11 +92,11 @@ module.exports.resolveComponentsPath = async function (resolver, request) {
     }
     let relPath = componentGenerics[element].default
     let component = await resolveComponent(resolver, context, relPath)
-    components.set(key, {
+    components.set(element, {
       request,
       origin: relPath,
       absPath: component,
-      type: 'normal'
+      type: 'generics'
     })
   })
 
@@ -107,4 +107,20 @@ module.exports.resolveComponentsPath = async function (resolver, request) {
   ])
 
   return components
+}
+
+module.exports.loadInitComponentFiles = async function (jsons, componentSet, resolver) {
+  let nextJsons = []
+  for (const json of jsons) {
+    let components = await module.exports.resolveComponentsPath(resolver, json)
+
+    for (const [key, component] of components) {
+      componentSet.add({ tag: key, component })
+      if (component.type === 'normal' || (component.type === 'generics' && component.absPath)) {
+        nextJsons.push(component.absPath)
+      }
+    }
+  }
+
+  nextJsons.length && await module.exports.loadInitComponentFiles(nextJsons, componentSet, resolver)
 }

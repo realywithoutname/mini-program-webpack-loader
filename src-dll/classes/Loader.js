@@ -45,7 +45,7 @@ class MiniLoader {
           this.addDepsModule(value.sourcePath)
         )
 
-        deps.push(value.sourcePath)
+        deps.push(value)
       }
 
       /**

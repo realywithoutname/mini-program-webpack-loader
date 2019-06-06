@@ -1,7 +1,9 @@
 const {
   join,
   dirname,
-  relative
+  extname,
+  relative,
+  basename
 } = require('path')
 
 exports.camelCase = (str) => {
@@ -40,6 +42,13 @@ exports.isObject = function (val) {
 
 exports.relative = (from, to) => {
   return './' + relative(dirname(from), to).replace(/\\/g, '/')
+}
+
+exports.removeExt = (file) => {
+  return join(
+    dirname(file),
+    basename(file, extname(file))
+  )
 }
 
 exports.isEmpty = (obj) => {
