@@ -33,7 +33,7 @@ const CONFIG = {
   }
 }
 
-module.exports.toTargetPath = function (file) {
+module.exports.resolveTargetPath = function (file) {
   let target = process.env.TARGET || 'wx'
   let TARGET = CONFIG[target]
   let ext = extname(file)

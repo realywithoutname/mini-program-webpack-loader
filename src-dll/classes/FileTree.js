@@ -1,4 +1,6 @@
-const { toTargetPath } = require('../helpers/path')
+const { basename, dirname, join } = require('path')
+const { resolveTargetPath } = require('../helpers/resolve-target-path')
+const { relative } = require('../utils')
 
 const set = (target, key, val) => {
   target[key] = val
@@ -22,14 +24,19 @@ let regRules = {
 function getFileMeta (file, outputUtil) {
   let meta = {
     source: file,
-    dist: toTargetPath(
+    dist: resolveTargetPath(
       outputUtil.get(file)
     ),
-    deps: new Set()
+    deps: new Set(),
+    used: new Set()
   }
 
   meta.updateHash = function (hash) {
     meta.hash = hash
+  }
+
+  meta.clone = function () {
+    return { ...meta }
   }
 
   for (const key in regRules) {
@@ -49,9 +56,11 @@ class FileTree {
     this.tree.set('pages', new Map())
     this.tree.set('files', new Map())
     this.tree.set('components', new Map())
+    this.tree.set('globalComponents', new Map())
 
     this.outputMap = {}
     this.miniLoader = miniLoader
+    this.id = 0
   }
 
   get size () {
@@ -122,9 +131,13 @@ class FileTree {
     return this.tree.get('entry')
   }
 
-  addEntry (entry) {
+  addEntry (entry, files) {
     if (!this.entry.has(entry)) {
-      this.tree.set(entry, this.setFile([entry], true))
+      this.setFile(entry, null, true)
+      const entryMeta = this.getFile(entry)
+
+      this.setFile(files, entryMeta)
+      this.tree.set(entry, entryMeta)
       this.entry.add(entry)
     }
   }
@@ -134,9 +147,9 @@ class FileTree {
    * @param {*} pageFiles
    * @param {*} isSubPkg
    */
-  addPage (pagePath, pageFiles, inSubPkg, isIndependent) {
+  addPage (pagePath, pageFiles, inSubPkg, isIndependent, entry) {
     let pagesMap = this.pages
-    let pageFileSet = this.setFile(pageFiles, false, isIndependent)
+    let pageFileSet = this.setFile(pageFiles, this.getFile(entry), false, isIndependent)
 
     pagesMap.set(pagePath, {
       isSub: inSubPkg,
@@ -148,42 +161,86 @@ class FileTree {
    * json 文件树结构
    * @param {*} file
    * @param {*} tag
-   * @param {*} componentPath
+   * @param {*} componentPath 组件的绝对路径
    * @param {*} componentFiles
+   * 自定义组件 json 文件
+   * {
+   *  source: file,
+   *  dist: resolveTargetPath(
+   *    outputUtil.get(file)
+   *  ),
+   *  deps: new Set(),
+   *  used: new Set(),
+   *  isJson: true,
+   *  components: new Map([componentName, componentAbsolutePath]),
+   *  generics: new Map
+   * }
+   *
+   * Component 结构
+   * {
+   *  files: Set([fileMeta]),
+   *  used: Set([file]),
+   *  type: Map([file, type]),
+   *  json: Function => fileMeta
+   * }
    */
-  addComponent (file, tag, componentPath, componentFiles) {
-    let fileMap = this.files
-    let { components, isIndependent } = fileMap.get(file)
-    let componentFileSet = this.setFile(componentFiles, false, isIndependent)
-
-    components.set(tag, componentPath)
-
+  addComponent (file, tag, componentPath, componentFiles, type) {
+    const fileMap = this.files
+    const fileMeta = fileMap.get(file)
+    const { components, isIndependent } = fileMeta
+    const componentFileSet = this.setFile(componentFiles, fileMeta, false, isIndependent)
     let component = this.components.get(componentPath)
 
     if (!component) {
-      component = { files: new Set(), used: new Set() }
+      component = {
+        files: new Set(),
+        used: new Set(),
+        type: new Map(),
+        get json () {
+          const jsonFile = componentFiles.find(item => /\.json/.test(item))
+          return fileMap.get(jsonFile)
+        }
+      }
       this.components.set(componentPath, component)
     }
 
+    component.type.set(file, type)
     component.files = componentFileSet
     component.used.add(file)
+
+    // 全局自定义组件不需要放在 json 文件上，应该单独管理，否则会导致解析后的入口 json 文件内容不对
+    const entry = this.tree.get('entry')
+    if (entry.has(file)) {
+      this.tree.get('globalComponents').set(tag, componentPath)
+      return
+    }
+
+    components.set(tag, componentPath)
   }
 
   /**
    * @param {*} file
    * @param {*} depFiles
    */
-  addDeps (file, depFiles) {
+  addDeps (file, deps) {
     let fileMap = this.files
     let fileMeta = fileMap.get(file)
-
-    const deps = this.setFile(depFiles)
+    const depMetas = new Set()
 
     for (const item of deps) {
-      if (/\.wxml$/.test(item.source)) item.isTemplate = true
+      const meta = this.setFile(item.sourcePath, fileMeta)
+
+      meta.forEach(meta => {
+        // 一个文件可能被多个地方引用，在每个文件中使用的路径不同
+        meta.depPath = meta.depPath || new Map()
+        meta.depPath.set(file, item.origin)
+        if (/\.wxml$/.test(meta.source)) meta.isTemplate = true
+      })
+
+      depMetas.add(...meta)
     }
 
-    fileMeta.deps = deps
+    fileMeta.deps = depMetas
   }
 
   has (file) {
@@ -194,7 +251,25 @@ class FileTree {
     return this.pages.has(page)
   }
 
-  setFile (files, ignore, isIndependent) {
+  copyFile (originFile, newDistFile) {
+    const originMeta = this.files.get(originFile)
+    const fileMeta = originMeta.clone()
+
+    originMeta.deps.forEach(meta => {
+      meta.used.add(fileMeta)
+    })
+    this.files.set(newDistFile, fileMeta)
+    fileMeta.dist = newDistFile
+    this.outputMap[newDistFile] = newDistFile
+  }
+  /**
+   * 添加文件
+   * @param {*} files 要添加的文件
+   * @param {*} user 文件使用者
+   * @param {*} ignore 是否检查输出路径
+   * @param {*} isIndependent 是否在独立分包
+   */
+  setFile (files, user, ignore, isIndependent, dist) {
     let fileMap = this.files
     let fileSet = new Set()
 
@@ -202,13 +277,18 @@ class FileTree {
 
     for (const file of files) {
       if (fileMap.has(file)) {
-        fileSet.add(fileMap.get(file))
+        const meta = fileMap.get(file)
+
+        fileSet.add(meta)
+        user && meta.used.add(user)
         continue
       }
 
       let meta = getFileMeta(file, this.miniLoader.outputUtil)
-      let distFile = this.outputMap[meta.dist]
+      let distFile = dist || this.outputMap[meta.dist]
 
+      user && meta.used.add(user)
+      meta.id = ++this.id
       meta.isIndependent = isIndependent
 
       // 允许引用不同的 node_modules 下的文件
@@ -251,6 +331,54 @@ class FileTree {
     }
 
     return this.getFile(dist, true)
+  }
+
+  getCanUseComponents (wxmlFile, dist) {
+    if (!/\.wxml/.test(wxmlFile)) throw new Error('只能获取 wxml 文件类型可使用组件')
+
+    const jsonFile = wxmlFile.replace('.wxml', '.json')
+
+    let usingComponents = new Map()
+    let components = null
+
+    // 文件本身定义的自定义组件
+    let fileMeta = this.getFile(jsonFile, true)
+    components = fileMeta.components
+
+    const merge = (components) => {
+      for (const [tag, path] of components) {
+        if (usingComponents.has(tag) || !path) continue
+
+        const { type, json: componentJson } = this.components.get(path)
+        const conponentType = type.get(jsonFile)
+
+        if (conponentType === 'generics') {
+          continue
+        }
+        if (conponentType === 'plugin') {
+          usingComponents.set(tag, path)
+          continue
+        }
+
+        const relPath = relative(dist, componentJson.dist)
+
+        usingComponents.set(
+          tag,
+          join(
+            dirname(relPath),
+            basename(relPath, '.json')
+          )
+        )
+      }
+    }
+
+    merge(components)
+
+    const globalComponents = this.tree.get('globalComponents')
+
+    merge(globalComponents)
+
+    return usingComponents
   }
 
   removeFile (file) {

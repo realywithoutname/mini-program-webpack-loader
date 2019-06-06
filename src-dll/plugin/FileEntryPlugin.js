@@ -1,3 +1,4 @@
+const { existsSync } = require('fs')
 const { Tapable, SyncHook } = require('tapable')
 const { ConcatSource } = require('webpack-sources')
 const { dirname, join, extname, basename } = require('path')
@@ -9,7 +10,7 @@ const { getFiles } = require('../helpers/get-files')
 const { mergeEntrys } = require('../helpers/merge-entry')
 const { getAcceptPackages } = require('../helpers/parse-entry')
 const { createResolver } = require('../helpers/create-resolver')
-const { resolveComponentsPath } = require('../helpers/component')
+const { resolveComponentsPath, loadInitComponentFiles } = require('../helpers/component')
 const { ENTRY_ACCEPT_FILE_EXTS } = require('../config/constant')
 
 const mainChunkNameTemplate = '__assets_chunk_name__'
@@ -41,8 +42,11 @@ module.exports = class FileEntryPlugin extends Tapable {
     this.entrys = this.miniLoader.miniEntrys
     this.resolver = createResolver(compiler)
 
-    compiler.hooks.emit.tapAsync('MiniPlugin', this.setEmitHook.bind(this))
+    compiler.hooks.beforeCompile.tapAsync('MiniProgramPlugin', this.beforeCompile.bind(this))
+    compiler.hooks.emit.tapAsync('MiniProgramPlugin', this.setEmitHook.bind(this))
     compiler.hooks.compilation.tap('MiniProgramPlugin', this.setCompilation.bind(this))
+
+    this.isFirstCompile = true
 
     this.start()
     this.loadProjectFiles()
@@ -54,6 +58,37 @@ module.exports = class FileEntryPlugin extends Tapable {
     // 检查是否需要重新编译
     compilation.hooks.needAdditionalPass.tap('MiniProgramPlugin', () => this.needAdditionalPass)
   }
+
+  beforeCompile (prarams, callback) {
+    const jsons = [...this.entrys]
+    Object.keys(this.packages).forEach((root) => {
+      const { pages } = this.packages[root]
+
+      pages.forEach(page => {
+        const pageJson = `${page}.json`
+
+        if (existsSync(pageJson)) {
+          jsons.push(pageJson)
+        }
+      })
+    })
+
+    const componentSet = new Set()
+    const files = []
+
+    loadInitComponentFiles(jsons, componentSet, this.resolver)
+      .then(() => {
+        const jsons = Array.from(componentSet)
+        jsons.forEach(({ tag, component }) => {
+          files.push(
+            ...this.addConponent(tag, component)
+          )
+        })
+
+        this.addEntrys(files)
+        callback()
+      })
+  }
   /**
    * 处理自定义组件文件依赖
    * @param {*} chunks
@@ -61,7 +96,14 @@ module.exports = class FileEntryPlugin extends Tapable {
    * @param {*} callback
    */
   optimizeTree (chunks, modules, callback) {
+    if (this.isFirstCompile) {
+      this.isFirstCompile = false
+      return callback()
+    }
+
+    let files = []
     let jsonLoadPromises = []
+
     const { lastTimestamps = new Map() } = this
     const timestamps = this.compilation.fileTimestamps
 
@@ -73,6 +115,14 @@ module.exports = class FileEntryPlugin extends Tapable {
 
       if (jsonPath && /\.json/.test(jsonPath)) {
         if ((lastTimestamps.get(jsonPath) || this.startTime) < (timestamps.get(jsonPath) || Infinity)) {
+          // 如果是入口文件改变，因为涉及到最后计算输出 json 内容需要更新
+          // 新页面需要添加到编译
+          if (this._row[jsonPath]) {
+            const newPageFiles = this.start()
+
+            files = files.concat(newPageFiles)
+          }
+
           jsonLoadPromises.push(
             resolveComponentsPath(this.resolver, jsonPath)
           )
@@ -86,30 +136,13 @@ module.exports = class FileEntryPlugin extends Tapable {
       .then((components) => {
         this.lastTimestamps = timestamps
 
-        let files = []
-
         components.forEach(componentMap => {
           for (const [key, item] of componentMap) {
-            // TODO 开口子接受替换自定义组件的路径
-
-            // 自定义组件依赖文件收集
-            const component = item.absPath
-            const context = dirname(component)
-            const path = basename(component, '.json')
-            const componentfiles = item.type === 'normal' ? getFiles(context, path) : []
-
-            // 只添加未被添加的文件
             files = files.concat(
-              componentfiles.filter(
-                file => !this.miniLoader.fileTree.has(file)
-              )
+              this.addConponent(key, item)
             )
-
-            // 添加文件关系
-            this.miniLoader.fileTree.addComponent(item.request, key, item.origin, componentfiles, item.type)
           }
         })
-
         this.needAdditionalPass = files.length > 0
         this.hooks.addFiles.call(files)
 
@@ -168,8 +201,22 @@ module.exports = class FileEntryPlugin extends Tapable {
       if (this.packages.hasOwnProperty(root)) {
         const element = this.packages[root]
 
-        if (!element.root) appCode.pages = element.pages || []
-        else appCode.subPackages.push(element)
+        if (!element.root) {
+          appCode.pages = (element.pages || []).map((page) => this.miniLoader.outputUtil.get(page))
+        } else {
+          const { pages: subPages, root } = element
+
+          const distPages = subPages.map((page) => {
+            const dist = this.miniLoader.outputUtil.get(page)
+
+            return dist.replace(`${root}/`, '')
+          })
+
+          appCode.subPackages.push({
+            ...element,
+            pages: distPages
+          })
+        }
       }
     }
 
@@ -213,26 +260,27 @@ module.exports = class FileEntryPlugin extends Tapable {
 
   start (params, callback) {
     this.entrys.forEach(entry => {
-      const context = dirname(entry)
       const pkgs = this.getEntryPackages(entry)
-      this.mergePackges(context, pkgs)
+      this.mergePackges(entry, pkgs)
     })
 
     const files = []
 
     Object.keys(this.packages).forEach((root) => {
-      const { pages, isIndependent } = this.packages[root]
+      const { pages, isIndependent, entry } = this.packages[root]
       pages.forEach(page => {
         // TODO 可以更改页面的路径
         const pageFiles = getFiles('', page)
 
-        this.miniLoader.fileTree.addPage(page, pageFiles, !!root, isIndependent)
+        pageFiles.forEach(file => !this.miniLoader.fileTree.has(file) && files.push(file))
 
-        pageFiles.forEach(file => files.push(file))
+        this.miniLoader.fileTree.addPage(page, pageFiles, !!root, isIndependent, entry)
       })
     })
 
     this.addEntrys(files)
+
+    return files
   }
 
   loadProjectFiles () {
@@ -290,21 +338,20 @@ module.exports = class FileEntryPlugin extends Tapable {
 
     this.addEntrys(files)
     // TODO 下次更新应该要清理上次的文件
-    this.miniLoader.fileTree.addEntry(entry)
-    this.miniLoader.fileTree.setFile(files)
+    this.miniLoader.fileTree.addEntry(entry, files)
 
     this._row[entry] = require(entry)
 
     return getAcceptPackages(this._entrysConfig[entry], this._row[entry])
   }
 
-  mergePackges (context, newPackages) {
+  mergePackges (entry, newPackages) {
+    const context = dirname(entry)
     const pkgs = this.packages
     newPackages.forEach(({ root, pages, name, isIndependent }) => {
-      const pkg = pkgs[root] = pkgs[root] || {}
+      const pkg = pkgs[root] = pkgs[root] || { }
 
       pages = pages.map(page => join(context, root, page))
-      console.log(pkg, pages)
       if (!isEmpty(pkg)) {
         console.assert(Boolean(pkg.isIndependent) === Boolean(isIndependent), `独立分包不支持于非独立分包合并: ${root}`)
 
@@ -321,9 +368,33 @@ module.exports = class FileEntryPlugin extends Tapable {
         pages,
         name,
         root,
+        entry,
         isIndependent
       }
     })
+  }
+
+  addConponent (tag, item) {
+    // TODO 开口子接受替换自定义组件的路径
+
+    // 自定义组件依赖文件收集
+    const component = item.absPath
+    const context = dirname(component)
+    const path = basename(component, '.json')
+    let componentfiles = []
+
+    if (item.type === 'normal' || (item.type === 'generics' && component)) {
+      componentfiles = getFiles(context, path)
+    }
+
+    const newFiles = componentfiles.filter(
+      file => !this.miniLoader.fileTree.has(file)
+    )
+
+    // 添加文件关系
+    this.miniLoader.fileTree.addComponent(item.request, tag, component, componentfiles, item.type)
+
+    return newFiles
   }
 
   addEntrys (files) {
