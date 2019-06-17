@@ -8,7 +8,7 @@ module.exports.mergeEntrys = function (entrysCode, mainEntry) {
     if (entrysCode.hasOwnProperty(key)) {
       const rowCode = entrysCode[key]
       const isMain = key === mainEntry
-      const { preloadRule, plugins } = rowCode
+      const { preloadRule, plugins = {} } = rowCode
 
       Object.assign(code.preloadRule, preloadRule)
 

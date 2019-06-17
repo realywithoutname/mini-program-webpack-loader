@@ -10,7 +10,7 @@ const { getFiles } = require('../helpers/get-files')
 const { mergeEntrys } = require('../helpers/merge-entry')
 const { getAcceptPackages } = require('../helpers/parse-entry')
 const { createResolver } = require('../helpers/create-resolver')
-const { resolveComponentsPath, loadInitComponentFiles } = require('../helpers/component')
+const { resolveComponentsPath, loadInitComponentFiles } = require('../helpers/resolve-component-path')
 const { ENTRY_ACCEPT_FILE_EXTS } = require('../config/constant')
 
 const mainChunkNameTemplate = '__assets_chunk_name__'
@@ -42,9 +42,9 @@ module.exports = class FileEntryPlugin extends Tapable {
     this.entrys = this.miniLoader.miniEntrys
     this.resolver = createResolver(compiler)
 
-    compiler.hooks.beforeCompile.tapAsync('MiniProgramPlugin', this.beforeCompile.bind(this))
-    compiler.hooks.emit.tapAsync('MiniProgramPlugin', this.setEmitHook.bind(this))
-    compiler.hooks.compilation.tap('MiniProgramPlugin', this.setCompilation.bind(this))
+    compiler.hooks.beforeCompile.tapAsync('FileEntryPlugin', this.beforeCompile.bind(this))
+    compiler.hooks.emit.tapAsync('FileEntryPlugin', this.setEmitHook.bind(this))
+    compiler.hooks.compilation.tap('FileEntryPlugin', this.setCompilation.bind(this))
 
     this.isFirstCompile = true
 
@@ -54,9 +54,9 @@ module.exports = class FileEntryPlugin extends Tapable {
 
   setCompilation (compilation) {
     this.compilation = compilation
-    compilation.hooks.optimizeTree.tapAsync('MiniProgramPlugin', (chunks, modules, cb) => this.optimizeTree(chunks, modules, cb))
+    compilation.hooks.optimizeTree.tapAsync('FileEntryPlugin', (chunks, modules, cb) => this.optimizeTree(chunks, modules, cb))
     // 检查是否需要重新编译
-    compilation.hooks.needAdditionalPass.tap('MiniProgramPlugin', () => this.needAdditionalPass)
+    compilation.hooks.needAdditionalPass.tap('FileEntryPlugin', () => this.needAdditionalPass)
   }
 
   beforeCompile (prarams, callback) {
@@ -75,7 +75,9 @@ module.exports = class FileEntryPlugin extends Tapable {
 
     const componentSet = new Set()
     const files = []
-
+    /**
+     * 第一次加载时，一次性把所以文件都添加到编译，减少编译时间
+     */
     loadInitComponentFiles(jsons, componentSet, this.resolver)
       .then(() => {
         const jsons = Array.from(componentSet)
@@ -154,10 +156,9 @@ module.exports = class FileEntryPlugin extends Tapable {
 
   setEmitHook (compilation, callback) {
     let assets = compilation.assets
-
     assets['app.js'] = this.getAppJsCode(assets)
     assets['app.wxss'] = this.getAppWxss(assets)
-    assets['app.json'] = this.getAppJson(assets)
+    assets['app.json'] = this.getAppJsonCode(assets)
 
     if (this.options.extfile) {
       assets['ext.json'] = this.getExtJson(assets)
@@ -220,7 +221,11 @@ module.exports = class FileEntryPlugin extends Tapable {
       }
     }
 
-    return new ConcatSource(JSON.stringify(appCode))
+    return appCode
+  }
+
+  getAppJsonCode () {
+    return new ConcatSource(JSON.stringify(this.getAppJson()))
   }
 
   getExtJson (assets) {

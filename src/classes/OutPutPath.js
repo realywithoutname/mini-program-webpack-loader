@@ -7,6 +7,7 @@ module.exports = class OutPutPath {
     this.outputPath = outPath
     this.compilerContext = context
   }
+
   get (path) {
     let fullPath = this.compilerContext
     let npmReg = /node_modules/g

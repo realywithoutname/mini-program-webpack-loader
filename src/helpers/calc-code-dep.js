@@ -16,6 +16,9 @@ module.exports.calcCodeDep = function calcCodeDep (miniLoader, dist, codeSource)
 
   let { isWxml, isWxss, isWxs, isJson, components, deps } = fileMeta
 
+  /**
+   * 小程序文件处理
+   */
   if ((isWxml || isWxss || isWxs) && deps.size) {
     for (const dep of deps) {
       const reg = `('|")${dep.depPath.get(fileMeta.source)}('|")`
@@ -26,6 +29,10 @@ module.exports.calcCodeDep = function calcCodeDep (miniLoader, dist, codeSource)
     }
   }
 
+  /**
+   * json 文件处理，主要处理自定义组件的 json 文件
+   * 计算自定义组件的相对路径
+   */
   if (isJson && components.size) {
     code = JSON.parse(code)
 

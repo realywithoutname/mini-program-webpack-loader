@@ -1,8 +1,9 @@
 const { Tapable, SyncHook, SyncLoopHook, SyncWaterfallHook } = require('tapable')
 const fs = require('fs')
+const readline = require('readline')
+const { ProgressPlugin } = require('webpack')
 const { ConcatSource } = require('webpack-sources')
 const { dirname, join } = require('path')
-
 const Loader = require('../classes/Loader')
 const FileTree = require('../classes/FileTree')
 const OutPutPath = require('../classes/OutPutPath')
@@ -31,6 +32,8 @@ const defaultOptions = {
     // accept
   }
 }
+
+const stdout = process.stdout
 
 module.exports = class MiniProgramPlugin extends Tapable {
   constructor (options) {
@@ -82,9 +85,11 @@ module.exports = class MiniProgramPlugin extends Tapable {
     new MiniTemplatePlugin(this).apply(compiler)
     new WeixinProgramPlugin(this).apply(compiler)
     new ComponentPlugin(this).apply(compiler)
+    new ProgressPlugin({ handler: this.progress }).apply(compiler)
 
     compiler.hooks.environment.tap('MiniProgramPlugin', this.setEnvHook.bind(this))
     compiler.hooks.compilation.tap('MiniProgramPlugin', this.setCompilation.bind(this))
+    this.compiler.hooks.beforeCompile.tap('MiniPlugin', this.beforeCompile.bind(this))
     compiler.hooks.emit.tapAsync('MiniProgramPlugin', this.setEmitHook.bind(this))
   }
 
@@ -104,36 +109,83 @@ module.exports = class MiniProgramPlugin extends Tapable {
     }
   }
 
+  beforeCompile () {
+    let appJson = this.FileEntryPlugin.getAppJson()
+    let cachegroups = this.compiler.options.optimization.splitChunks.cacheGroups
+
+    if (this.options.setSubPackageCacheGroup) {
+      let groups = this.options.setSubPackageCacheGroup(this, appJson)
+      Object.assign(cachegroups, groups)
+    }
+
+    // if (appJson.subPackages) {
+    //   for (const { root } of appJson.subPackages) {
+    //     let name = root.replace('/', '')
+
+    //     cachegroups[`${name}Commons`] = {
+    //       name: `${root}/commonchunks`,
+    //       chunks: 'initial',
+    //       minSize: 0,
+    //       minChunks: 1,
+    //       test: module => moduleOnlyUsedBySubPackage(module, root + '/'),
+    //       priority: 3
+    //     }
+    //   }
+    // }
+  }
+
   setCompilation (compilation) {
     this.compilation = compilation
 
     // 统一输出路径
+    compilation.hooks.optimizeChunks.tap('MiniProgramPlugin', this.optimizeChunks.bind(this))
     compilation.mainTemplate.hooks.assetPath.tap('MiniProgramPlugin', path => this.outputUtil.get(path))
-    // compilation.hooks.optimizeChunks.tap('MiniProgramPlugin', chunks => this.optimizeChunks(chunks))
     // 添加额外文件
     compilation.hooks.additionalAssets.tapAsync('MiniProgramPlugin', callback => this.additionalAssets(compilation, callback))
   }
 
+  /**
+   * 输出打包进度
+   * @param {String} progress 进度
+   * @param {String} event
+   * @param {*} modules
+   */
+  progress (progress, event, modules) {
+    readline.clearLine(process.stdout)
+    readline.cursorTo(process.stdout, 0)
+
+    if (+progress === 1) return
+    stdout.write(`${'正在打包: '.gray} ${`${(progress * 100).toFixed(2)}%`.green} ${event || ''} ${modules || ''}`)
+  }
+
+  optimizeChunks (chunks) {
+    const ignoreEntrys = this.FileEntryPlugin.ignoreFiles
+    const fileUsedTemp = {}
+
+    for (const chunk of chunks) {
+      if (chunk.hasEntryModule() && ignoreEntrys.indexOf(`${chunk.name}.js`) === -1) {
+        // 记录模块之间依赖关系
+        for (const module of chunk.getModules()) {
+          if (!module.isEntryModule()) {
+            const resourcePath = module.resource
+            let chunkName = chunk.name + '.js'
+
+            const fileUsed = fileUsedTemp[resourcePath] = fileUsedTemp[resourcePath] || new Set()
+
+            fileUsed.add(chunkName)
+
+            module._usedModules = fileUsed
+          }
+        }
+      }
+    }
+  }
   additionalAssets (compilation, callback) {
     compilation.assets['webpack-require.js'] = new ConcatSource(
       fs.readFileSync(join(__dirname, '../lib/require.js'), 'utf8')
     )
     callback()
   }
-
-  // optimizeChunks (chunks) {
-  //   let ignoreEntrys = this.FileEntryPlugin.ignoreFiles
-  //   for (const chunk of chunks) {
-  //     if (chunk.hasEntryModule() && !ignoreEntrys.indexOf(chunk.name) !== 0) {
-  //       // 记录模块之间依赖关系
-  //       for (const module of chunk.getModules()) {
-  //         if (!module.isEntryModule()) {
-  //           this.moduleHelper.addUser(module, chunk.name + '.js')
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
 
   setEmitHook (compilation, callback) {
     const assets = compilation.assets
@@ -157,7 +209,6 @@ module.exports = class MiniProgramPlugin extends Tapable {
         assets[dist] = source
         this.fileTree.getFileByDist(dist).isWxml &&
         this.hooks.emitWxml.call(origin, compilation, dist)
-
         /**
          * 获取要输出的路径列表
          * [
@@ -212,6 +263,9 @@ module.exports = class MiniProgramPlugin extends Tapable {
 
         code = code.replaceAll(file, relPath)
       })
+
+      //  有点危险，为了解决 webpack require 如果已经加载模块就不执行导致报 Component 为定义的问题
+      code = code.replaceAll(originDist, additionDist)
 
       return new ConcatSource(code)
     }
@@ -298,6 +352,7 @@ module.exports = class MiniProgramPlugin extends Tapable {
     // TODO 对于 movedFiles 数组应该先按照依赖关系排序后再处理（不处理可能存在由于先后顺序出现 bug）
     movedFiles.forEach(({ dist, dists }) => {
       let distNeedBeRemove = true
+
       const fileMeta = this.fileTree.getFileByDist(dist)
 
       dists.forEach(({ dist: additionDist, usedFile }) => {
@@ -377,6 +432,7 @@ module.exports = class MiniProgramPlugin extends Tapable {
     })
 
     this.lastTimestamps = timestamps
+    console.log('==== MiniProgramPlugin =====')
 
     callback()
   }

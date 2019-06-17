@@ -14,6 +14,7 @@ module.exports = class WeixinProgramPlugin {
 
   emitFile (source) {
     const fileMeta = this.miniLoader.fileTree.getFile(source)
+
     // 文件在子包，不需要移动
     if (this.miniLoader.moduleHelper.fileIsInSubPackage(source)) {
       return [{
@@ -40,7 +41,7 @@ module.exports = class WeixinProgramPlugin {
   }
 
   setEmitHook (compilation, callBack) {
-    console.log('=========')
+    console.log('==== WeixinProgramPlugin =====')
     callBack()
   }
 }

@@ -1,5 +1,5 @@
 const { dirname, basename, extname, join } = require('path')
-const { PROGRAM_ACCEPT_FILE_EXTS } = require('../config/constant')
+
 module.exports = class ModuleHelper {
   constructor (miniLoader) {
     this.miniLoader = miniLoader
@@ -35,8 +35,6 @@ module.exports = class ModuleHelper {
     const ext = extname(file)
     const name = basename(file, ext)
 
-    // if (PROGRAM_ACCEPT_FILE_EXTS.indexOf(ext) === -1) throw new Error(`文件 ${file} 必须有一个合法的扩展名`)
-
     return join(dir, `${name}.json`)
   }
 
@@ -47,12 +45,25 @@ module.exports = class ModuleHelper {
     return !!component
   }
 
+  moduleOnlyUsedBySubPackage (module, root) {
+    const file = module.resource
+    if (!/\.js$/.test(file) || module.isEntryModule()) return false
+
+    const users = module._usedModules
+
+    if (!users.size) return false
+
+    const reg = new RegExp(`^${root}`)
+
+    return !Array.from(users).some((source) => !reg.test(source))
+  }
+
   onlyUsedInSubPackagesReturnRoots (file) {
     if (!this.isComponentFile(file)) return false
 
     const { packages } = this.fileEntryPlugin
     const reg = new RegExp(
-      Object.keys(packages).filter(root => !!root).join('|')
+      Object.keys(packages).filter(root => !!root).map(root => `/${root}/`).join('|')
     )
 
     const fileMeta = this.fileTree.getFile(file)
@@ -65,12 +76,13 @@ module.exports = class ModuleHelper {
       if (matched) {
         roots.push({
           usedFile: source, // 在分包中这个文件被使用
-          root: matched[0]
+          root: matched[0].substr(1)
         })
         continue
       }
       isTrue = true
     }
+
     return !isTrue && roots
   }
 
@@ -81,7 +93,7 @@ module.exports = class ModuleHelper {
   fileIsInSubPackage (file) {
     const { packages } = this.fileEntryPlugin
     const reg = new RegExp(
-      Object.keys(packages).filter(root => !!root).join('|')
+      Object.keys(packages).filter(root => !!root).map(root => `/${root}/`).join('|')
     )
 
     return reg.test(file)

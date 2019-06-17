@@ -2,6 +2,30 @@ const { basename, dirname, join } = require('path')
 const { resolveTargetPath } = require('../helpers/resolve-target-path')
 const { relative } = require('../utils')
 
+/**
+FileNode: {
+  source: String, // 文件绝对路径
+  dist: String, // 文件输出路径
+  deps: Set([FileNode]), // 文件依赖的文件
+  used: Set([FileNode]), // 文件被依赖的文件（使用到这个文件）
+  isXXX: Boolean, // 文件类型
+  components: Map([componentName, path]), // json 文件才有的，组件名和组件的路径
+  generics: Map(), // 暂时没用
+}
+
+PageNode: {
+  isSub: Boolean, // 是不是分包
+  files: Set([FileNode]) // 页面依赖的文件
+}
+
+ComponentNode: {
+  files: Set([FileNode]), // 自定义组件依赖的文件
+  used: Set([file]), // 自定义组件被使用的文件
+  type: Map([file, type]), // 依赖的自定义组件的类型，在输出时需要用到
+  json: Function => fileMeta // 方便快速的找到依赖文件中的 json 文件
+}
+*/
+
 const set = (target, key, val) => {
   target[key] = val
   return target
@@ -228,7 +252,7 @@ class FileTree {
     const depMetas = new Set()
 
     for (const item of deps) {
-      const meta = this.setFile(item.sourcePath, fileMeta)
+      const meta = this.setFile(item.sourcePath, fileMeta, item.ignore)
 
       meta.forEach(meta => {
         // 一个文件可能被多个地方引用，在每个文件中使用的路径不同
