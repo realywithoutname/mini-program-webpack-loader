@@ -250,7 +250,7 @@ module.exports = class MiniProgam {
     ]
 
     // tabBar icons
-    entrys.concat((tabBar && tabBar.list && getTabBarIcons(this.mainContext, tabBar.list)) || [])
+    entrys = entrys.concat((tabBar && tabBar.list && getTabBarIcons(this.mainContext, tabBar.list)) || [])
 
     this.fileTree.setFile(
       flattenDeep(entrys)
