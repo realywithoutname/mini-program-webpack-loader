@@ -1,4 +1,5 @@
-const { join } = require('path')
+const { join, dirname } = require('path')
+const { relative } = require('../utils')
 /**
  * 资源目录排序，在计算路径时优先根据子路径计算
  * [
@@ -80,4 +81,11 @@ module.exports.orderSource = function orderSource (resources = []) {
   }
 
   return resolvePath(tree)
+}
+
+module.exports.resolveDepDistPath = function resolveDepDistPath (originDist, additionDist, depdist) {
+  const relPath = relative(originDist, depdist)
+  const depDist = join(dirname(additionDist), relPath)
+
+  return depDist
 }

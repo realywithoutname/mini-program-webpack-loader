@@ -1,4 +1,4 @@
-const { existsSync } = require('fs')
+const { existsSync, readFileSync } = require('fs')
 const { Tapable, SyncHook } = require('tapable')
 const { ConcatSource } = require('webpack-sources')
 const { dirname, join, extname, basename } = require('path')
@@ -10,7 +10,7 @@ const { getFiles } = require('../helpers/get-files')
 const { mergeEntrys } = require('../helpers/merge-entry')
 const { getAcceptPackages } = require('../helpers/parse-entry')
 const { createResolver } = require('../helpers/create-resolver')
-const { resolveComponentsPath, loadInitComponentFiles } = require('../helpers/resolve-component-path')
+const { resolveComponentsFiles } = require('../helpers/resolve-component-path')
 const { ENTRY_ACCEPT_FILE_EXTS } = require('../config/constant')
 
 const mainChunkNameTemplate = '__assets_chunk_name__'
@@ -48,7 +48,9 @@ module.exports = class FileEntryPlugin extends Tapable {
 
     this.isFirstCompile = true
 
+    // 根据已有的入口文件准备好最基础的 app.json 内容，并添加这些文件到 webpack 打包程序
     this.start()
+    // 添加一些项目相关的额外文件到 webpack 打包程序
     this.loadProjectFiles()
   }
 
@@ -59,7 +61,15 @@ module.exports = class FileEntryPlugin extends Tapable {
     compilation.hooks.needAdditionalPass.tap('FileEntryPlugin', () => this.needAdditionalPass)
   }
 
+  /**
+   * 添加项目依赖的自定义组件到编译
+   * @param {*} prarams
+   * @param {*} callback
+   */
   beforeCompile (prarams, callback) {
+    // 不是第一次处理的时候不需要进入这个逻辑
+    if (!this.isFirstCompile) return callback()
+
     const jsons = [...this.entrys]
     Object.keys(this.packages).forEach((root) => {
       const { pages } = this.packages[root]
@@ -73,23 +83,11 @@ module.exports = class FileEntryPlugin extends Tapable {
       })
     })
 
-    const componentSet = new Set()
-    const files = []
     /**
-     * 第一次加载时，一次性把所以文件都添加到编译，减少编译时间
+     * 添加依赖的自定义组件
      */
-    loadInitComponentFiles(jsons, componentSet, this.resolver)
-      .then(() => {
-        const jsons = Array.from(componentSet)
-        jsons.forEach(({ tag, component }) => {
-          files.push(
-            ...this.addConponent(tag, component)
-          )
-        })
-
-        this.addEntrys(files)
-        callback()
-      })
+    this.loadComponentsFiles(jsons)
+      .then(() => callback())
   }
   /**
    * 处理自定义组件文件依赖
@@ -103,12 +101,11 @@ module.exports = class FileEntryPlugin extends Tapable {
       return callback()
     }
 
-    let files = []
-    let jsonLoadPromises = []
-
     const { lastTimestamps = new Map() } = this
     const timestamps = this.compilation.fileTimestamps
 
+    const jsons = []
+    let files = []
     /**
      * 获取所有 json 文件中对自定义组件的依赖
      */
@@ -125,30 +122,18 @@ module.exports = class FileEntryPlugin extends Tapable {
             files = files.concat(newPageFiles)
           }
 
-          jsonLoadPromises.push(
-            resolveComponentsPath(this.resolver, jsonPath)
-          )
+          jsons.push(jsonPath)
         }
       }
     })
 
-    if (!jsonLoadPromises.length) return callback()
+    if (!jsons.length) return callback()
 
-    Promise.all(jsonLoadPromises)
-      .then((components) => {
-        this.lastTimestamps = timestamps
-
-        components.forEach(componentMap => {
-          for (const [key, item] of componentMap) {
-            files = files.concat(
-              this.addConponent(key, item)
-            )
-          }
-        })
+    this.loadComponentsFiles(jsons)
+      .then((comFiles) => {
+        files = files.concat(comFiles)
         this.needAdditionalPass = files.length > 0
         this.hooks.addFiles.call(files)
-
-        this.addEntrys(files)
 
         callback()
       })
@@ -182,8 +167,11 @@ module.exports = class FileEntryPlugin extends Tapable {
 
   getAppWxss (assets) {
     let source = new ConcatSource()
+
     this.entrys.forEach(entry => {
       let entryName = this.getEntryName(entry)
+      if (!assets[`${entryName}.wxss`]) return
+
       source.add(`/* ${entryName}.wxss */\n`)
       source.add(
         assets[`${entryName}.wxss`]
@@ -265,6 +253,7 @@ module.exports = class FileEntryPlugin extends Tapable {
 
   start (params, callback) {
     this.entrys.forEach(entry => {
+      this._row[entry] && this.clearEntryPackages(entry)
       const pkgs = this.getEntryPackages(entry)
       this.mergePackges(entry, pkgs)
     })
@@ -305,24 +294,26 @@ module.exports = class FileEntryPlugin extends Tapable {
       getFiles(context, 'project.config', ['.json'])
     )
 
-    // 对于不同平台需要单独处理
-    let tabBar = this._row[this.mainEntry].tabBar
+    if (!this.options.ignoreTabbar) {
+      // 对于不同平台需要单独处理
+      let tabBar = this._row[this.mainEntry].tabBar
 
-    !tabBar && Object.keys(this._row).forEach(entry => {
-      const code = this._row[entry]
-      if (entry !== this.mainEntry) {
-        tabBar = code.tabBar
-      }
-    })
+      !tabBar && Object.keys(this._row).forEach(entry => {
+        const code = this._row[entry]
+        if (entry !== this.mainEntry) {
+          tabBar = code.tabBar
+        }
+      })
 
-    tabBar && tabBar.list && tabBar.list.forEach(
-      ({ selectedIconPath, iconPath }) => {
-        selectedIconPath && files.push(
-          join(context, selectedIconPath)
-        )
-        iconPath && files.push(join(context, iconPath))
-      }
-    )
+      tabBar && tabBar.list && tabBar.list.forEach(
+        ({ selectedIconPath, iconPath }) => {
+          selectedIconPath && files.push(
+            join(context, selectedIconPath)
+          )
+          iconPath && files.push(join(context, iconPath))
+        }
+      )
+    }
 
     this.addEntrys(files)
     this.miniLoader.fileTree.setFile(
@@ -342,10 +333,11 @@ module.exports = class FileEntryPlugin extends Tapable {
     const files = getFiles(dir, fileName, exts)
 
     this.addEntrys(files)
-    // TODO 下次更新应该要清理上次的文件
     this.miniLoader.fileTree.addEntry(entry, files)
 
-    this._row[entry] = require(entry)
+    this._row[entry] = JSON.parse(
+      readFileSync(entry, { encoding: 'utf8' })
+    )
 
     return getAcceptPackages(this._entrysConfig[entry], this._row[entry])
   }
@@ -361,10 +353,10 @@ module.exports = class FileEntryPlugin extends Tapable {
         console.assert(Boolean(pkg.isIndependent) === Boolean(isIndependent), `独立分包不支持于非独立分包合并: ${root}`)
 
         pkgs[root].pages = [
-          ...new Set(
+          ...new Set([
             ...pkgs[root].pages,
             ...pages
-          )
+          ])
         ]
         return
       }
@@ -377,6 +369,51 @@ module.exports = class FileEntryPlugin extends Tapable {
         isIndependent
       }
     })
+  }
+
+  clearEntryPackages (entry) {
+    const context = dirname(entry)
+    const { pages = [], subPackages = [] } = this._row[entry] || {}
+    const pkgs = this.packages
+
+    ;[
+      {
+        root: '',
+        pages
+      },
+      ...subPackages
+    ].forEach(({ root, pages }) => {
+      let cachePages = pkgs[root].pages
+
+      pages.forEach(page => {
+        let index = cachePages.indexOf(join(context, root, page))
+
+        if (index !== -1) {
+          cachePages.splice(index, 1)
+        }
+      })
+    })
+  }
+
+  loadComponentsFiles (jsons) {
+    const componentSet = new Set()
+    const files = []
+    /**
+     * 第一次加载时，一次性把所以文件都添加到编译，减少编译时间
+     */
+    return resolveComponentsFiles(jsons, componentSet, this.resolver)
+      .then(() => {
+        const jsons = Array.from(componentSet)
+        jsons.forEach(({ tag, component }) => {
+          files.push(
+            ...this.addConponent(tag, component)
+          )
+        })
+
+        this.addEntrys(files)
+
+        return files
+      })
   }
 
   addConponent (tag, item) {

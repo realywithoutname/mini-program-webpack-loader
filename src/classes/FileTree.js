@@ -156,12 +156,18 @@ class FileTree {
   }
 
   addEntry (entry, files) {
+    this.entry.has(entry) && this.clearFiles(
+      this.getFile(entry)
+    )
+
     if (!this.entry.has(entry)) {
       this.setFile(entry, null, true)
       const entryMeta = this.getFile(entry)
 
-      this.setFile(files, entryMeta)
+      const depFiles = this.setFile(files, entryMeta)
       this.tree.set(entry, entryMeta)
+
+      entryMeta.files = depFiles
       this.entry.add(entry)
     }
   }
@@ -173,6 +179,8 @@ class FileTree {
    */
   addPage (pagePath, pageFiles, inSubPkg, isIndependent, entry) {
     let pagesMap = this.pages
+    this.clearFiles(pagesMap.get(pagePath))
+
     let pageFileSet = this.setFile(pageFiles, this.getFile(entry), false, isIndependent)
 
     pagesMap.set(pagePath, {
@@ -214,6 +222,8 @@ class FileTree {
     const { components, isIndependent } = fileMeta
     const componentFileSet = this.setFile(componentFiles, fileMeta, false, isIndependent)
     let component = this.components.get(componentPath)
+
+    this.clearFiles(component)
 
     if (!component) {
       component = {
@@ -275,17 +285,6 @@ class FileTree {
     return this.pages.has(page)
   }
 
-  copyFile (originFile, newDistFile) {
-    const originMeta = this.files.get(originFile)
-    const fileMeta = originMeta.clone()
-
-    originMeta.deps.forEach(meta => {
-      meta.used.add(fileMeta)
-    })
-    this.files.set(newDistFile, fileMeta)
-    fileMeta.dist = newDistFile
-    this.outputMap[newDistFile] = newDistFile
-  }
   /**
    * 添加文件
    * @param {*} files 要添加的文件
@@ -403,6 +402,10 @@ class FileTree {
     merge(globalComponents)
 
     return usingComponents
+  }
+
+  clearFiles (depConfig = { files: new Set() }) {
+    // TODO 清理依赖的文件
   }
 
   removeFile (file) {

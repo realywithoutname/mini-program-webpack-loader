@@ -1,4 +1,5 @@
 const { dirname } = require('path')
+const { readFileSync } = require('fs')
 
 async function resolveComponent (resolver, context, component) {
   component = component + '.json'
@@ -34,8 +35,10 @@ function forEachComponentGenerics (componentGenerics, fn) {
   return ps
 }
 
-module.exports.resolveComponentsPath = async function resolveComponentsPath (resolver, request) {
-  const content = require(request)
+async function resolveComponentsPath (resolver, request) {
+  const content = JSON.parse(
+    readFileSync(request, { encoding: 'utf8' })
+  )
   const context = dirname(request)
   const components = new Map()
   const { componentGenerics, usingComponents, publicComponents } = content
@@ -109,10 +112,10 @@ module.exports.resolveComponentsPath = async function resolveComponentsPath (res
   return components
 }
 
-module.exports.loadInitComponentFiles = async function (jsons, componentSet, resolver) {
+module.exports.resolveComponentsFiles = async function (jsons, componentSet, resolver) {
   let nextJsons = []
   for (const json of jsons) {
-    let components = await module.exports.resolveComponentsPath(resolver, json)
+    let components = await resolveComponentsPath(resolver, json)
 
     for (const [key, component] of components) {
       componentSet.add({ tag: key, component })
@@ -122,5 +125,5 @@ module.exports.loadInitComponentFiles = async function (jsons, componentSet, res
     }
   }
 
-  nextJsons.length && await module.exports.loadInitComponentFiles(nextJsons, componentSet, resolver)
+  nextJsons.length && await module.exports.resolveComponentsFiles(nextJsons, componentSet, resolver)
 }

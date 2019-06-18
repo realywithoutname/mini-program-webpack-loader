@@ -9,7 +9,7 @@ module.exports = class WeixinProgramPlugin {
   }
 
   apply (compiler) {
-    compiler.hooks.emit.tapAsync('WeixinProgramPlugin', this.setEmitHook.bind(this))
+    // compiler.hooks.emit.tapAsync('WeixinProgramPlugin', this.setEmitHook.bind(this))
   }
 
   emitFile (source) {
