@@ -2,7 +2,7 @@
 
 基于 webpack 4.0 的小程序打包工具。
 
-支持 node v6 及以上版本
+**项目依赖 async/await, Set/Map, spread 等 es6+ 语法**
 
 ## 安装
 
