@@ -19,6 +19,10 @@ const CONFIG = {
 
     TPcss (path) {
       return path.replace('.pcss', '.acss')
+    },
+
+    TLess (path) {
+      return path.replace('.less', '.acss')
     }
   },
 
@@ -29,6 +33,10 @@ const CONFIG = {
 
     TPcss (path) {
       return path.replace('.pcss', '.wxss')
+    },
+
+    TLess (path) {
+      return path.replace('.less', '.wxss')
     }
   }
 }
