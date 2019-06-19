@@ -11,6 +11,7 @@ module.exports = class Xml {
     this.dist = dist // 如果支持修改输出路径后，dist 就不能通过通过内部计算
     this.request = request
     this.compilation = compilation
+    this.miniLoader = miniLoader
 
     this.getDistPath = src => miniLoader.outputUtil.get(
       resolveTargetPath(src)
@@ -64,7 +65,7 @@ module.exports = class Xml {
       )
     }
 
-    // undfnTags.length && console.log('\n', this.getDistPath(this.request), '中使用了未定义的自定义组件:', Array.from(new Set(undfnTags)).toString().yellow)
+    this.miniLoader.pushUndefinedTag(this.request, Array.from(new Set(undfnTags)))
   }
 
   formatComponent (components, handle) {

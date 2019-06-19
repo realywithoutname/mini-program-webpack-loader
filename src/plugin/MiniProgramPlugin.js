@@ -1,9 +1,15 @@
-const { Tapable, SyncHook, SyncLoopHook, SyncWaterfallHook } = require('tapable')
+const {
+  Tapable,
+  SyncHook,
+  SyncLoopHook,
+  SyncWaterfallHook
+} = require('tapable')
 const fs = require('fs')
 const readline = require('readline')
+const { dirname, join } = require('path')
 const { ProgressPlugin } = require('webpack')
 const { ConcatSource } = require('webpack-sources')
-const { dirname, join } = require('path')
+
 const Loader = require('../classes/Loader')
 const FileTree = require('../classes/FileTree')
 const OutPutPath = require('../classes/OutPutPath')
@@ -14,7 +20,6 @@ const ComponentPlugin = require('./ComponentPlugin')
 const MiniTemplatePlugin = require('./MiniTemplatePlugin')
 const WeixinProgramPlugin = require('./WeixinProgramPlugin')
 
-const { noop } = require('../utils')
 const { normalEntry } = require('../helpers/normal-entrys')
 const { calcCodeDep } = require('../helpers/calc-code-dep')
 const { copyMoveFiles } = require('../helpers/copy-move-files')
@@ -24,7 +29,6 @@ const defaultOptions = {
   commonSubPackages: true,
   analyze: false,
   resources: [],
-  beforeEmit: noop,
   compilationFinish: null,
   forPlugin: false,
   ignoreTabbar: false,
@@ -41,10 +45,13 @@ module.exports = class MiniProgramPlugin extends Tapable {
   constructor (options) {
     super()
 
+    this.undefinedTagTable = new Map()
     this.options = Object.assign(
       defaultOptions,
       options
     )
+
+    this.buildId = 0
 
     this.hooks = {
       beforeCompile: new SyncHook(['file']),
@@ -90,7 +97,7 @@ module.exports = class MiniProgramPlugin extends Tapable {
 
     compiler.hooks.environment.tap('MiniProgramPlugin', this.setEnvHook.bind(this))
     compiler.hooks.compilation.tap('MiniProgramPlugin', this.setCompilation.bind(this))
-    compiler.hooks.beforeCompile.tap('MiniPlugin', this.beforeCompile.bind(this))
+    compiler.hooks.beforeCompile.tap('MiniProgramPlugin', this.beforeCompile.bind(this))
     compiler.hooks.emit.tapAsync('MiniProgramPlugin', this.setEmitHook.bind(this))
   }
 
@@ -114,6 +121,7 @@ module.exports = class MiniProgramPlugin extends Tapable {
    * 根据 app.json 设置 cacheGroup
    */
   beforeCompile () {
+    this.undefinedTagTable.clear()
     let appJson = this.FileEntryPlugin.getAppJson()
     let cachegroups = this.compiler.options.optimization.splitChunks.cacheGroups
 
@@ -249,9 +257,50 @@ module.exports = class MiniProgramPlugin extends Tapable {
     callback()
   }
 
+  pushUndefinedTag (file, tags) {
+    tags.forEach(tag => {
+      const tagUsed = this.undefinedTagTable.get(tag) || new Set()
+
+      if (!this.undefinedTagTable.has(tag)) {
+        this.undefinedTagTable.set(tag, tagUsed)
+      }
+
+      tagUsed.add(
+        this.outputUtil.get(file)
+      )
+    })
+  }
+
   messageOutPut (err, assets) {
+    const log = (...rest) => (console.log(...rest) || true)
+
+    if (err) return log(err)
+
     const { startTime, endTime } = assets
 
-    console.log('Build success', err, (endTime - startTime) / 1000)
+    readline.clearLine(process.stdout)
+    readline.cursorTo(process.stdout, 0)
+    stdout.write(
+      `[${(new Date()).toLocaleTimeString().gray}] [${('id ' + ++this.buildId).gray}] ` +
+      ((endTime - startTime) / 1000).toFixed(2) + 's ' +
+      'Build finish'.green
+    )
+
+    if (this.undefinedTagTable.size) {
+      log('\n')
+      log('以下文件中使用了未在 json 中定义的组件'.red)
+
+      this.undefinedTagTable.forEach((files, tag) => {
+        if (tag === '=') return
+
+        log(`[${tag.yellow}]`)
+
+        files.forEach(val => log('  ', val.gray))
+      })
+
+      log('\n')
+    }
+
+    // console.log('Build success', err, (endTime - startTime) / 1000)
   }
 }

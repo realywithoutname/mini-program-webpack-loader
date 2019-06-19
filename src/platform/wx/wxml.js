@@ -6,10 +6,12 @@ module.exports.loadWxmlContent = function loadContent (compilation, getFileHelpe
   let content = resolveAssetContent(file, dist, compilation)
   let buff = new ConcatSource()
 
-  for (let { source } of depSet) {
+  for (let { source, isWxs } of depSet) {
     // 依赖的文件已经添加不需要再次添加
     if (loaded[source]) continue
     loaded[source] = true
+
+    if (isWxs) continue
 
     let depContent = loadContent(compilation, getFileHelper, source, loaded)
 

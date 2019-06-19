@@ -1,6 +1,6 @@
 {
   "name": "mini-program-webpack-loader",
-  "version": "0.3.0-beta.2",
+  "version": "0.3.0-beta.3",
   "description": "mini-program webpack loader",
   "main": "src/index.js",
   "scripts": {
