@@ -36,9 +36,5 @@ module.exports.mergeEntrys = function (entrysCode, mainEntry) {
     }
   }
 
-  delete code.pages
-  delete code.subPackages
-  delete code.usingComponents
-
   return code
 }

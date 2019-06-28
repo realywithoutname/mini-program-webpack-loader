@@ -184,6 +184,15 @@ module.exports = class FileEntryPlugin extends Tapable {
   getAppJson () {
     let appCode = mergeEntrys(this._row)
 
+    // 需要考虑到 this.packages 包括了主包（主包单独作为一个特殊分包进入编译流程），所以 if 需要 +1
+    // 如果有过滤条件的，那么直接删除 preloadRule
+    if (appCode.subPackages.length > Object.keys(this.packages).length + 1) {
+      delete appCode.preloadRule
+    }
+
+    delete appCode.pages
+    delete appCode.subPackages
+    delete appCode.usingComponents
     appCode.subPackages = []
 
     for (const root in this.packages) {
