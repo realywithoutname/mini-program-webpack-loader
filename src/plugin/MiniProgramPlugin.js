@@ -22,6 +22,7 @@ const WeixinProgramPlugin = require('./WeixinProgramPlugin')
 
 const { normalEntry } = require('../helpers/normal-entrys')
 const { calcCodeDep } = require('../helpers/calc-code-dep')
+const { analyzeGraph } = require('../helpers/analyze-graph')
 const { copyMoveFiles } = require('../helpers/copy-move-files')
 
 const defaultOptions = {
@@ -107,10 +108,8 @@ module.exports = class MiniProgramPlugin extends Tapable {
     // 下面两个地方都在使用 thisMessageOutPut, 先存起来
     const thisMessageOutPut = this.messageOutPut.bind(this)
     this.compiler.watch = options => watch.call(this.compiler, this.compiler.options, thisMessageOutPut)
-    this.compiler.run = (customFunc) => {
+    this.compiler.run = () => {
       return run.call(this.compiler, function () {
-        // 可能有自定义的回调方法，应该继承下
-        customFunc && customFunc.apply(null, arguments)
         // 按照原有的箭头函数代码，还是返回 messageOutPut 的绑定
         return thisMessageOutPut.apply(null, arguments)
       })
@@ -271,12 +270,12 @@ module.exports = class MiniProgramPlugin extends Tapable {
     })
   }
 
-  messageOutPut (err, assets) {
+  messageOutPut (err, stats) {
     const log = (...rest) => (console.log(...rest) || true)
 
     if (err) return log(err)
 
-    const { startTime, endTime } = assets
+    const { startTime, endTime } = stats
 
     readline.clearLine(process.stdout)
     readline.cursorTo(process.stdout, 0)
@@ -301,6 +300,6 @@ module.exports = class MiniProgramPlugin extends Tapable {
       log('\n')
     }
 
-    // console.log('Build success', err, (endTime - startTime) / 1000)
+    analyzeGraph(stats, this.compilation)
   }
 }

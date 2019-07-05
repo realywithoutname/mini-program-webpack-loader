@@ -252,6 +252,11 @@ class FileTree {
     components.set(tag, componentPath)
   }
 
+  addGlobalComponent (file, tag, json) {
+    const component = this.components.get(json)
+    const componentFiles = [...component.files].map(({ source }) => source)
+    this.addComponent(file, tag, json, componentFiles, 'normal')
+  }
   /**
    * @param {*} file
    * @param {*} depFiles
@@ -387,10 +392,13 @@ class FileTree {
 
         usingComponents.set(
           tag,
-          join(
-            dirname(relPath),
-            basename(relPath, '.json')
-          )
+          {
+            originPath: path,
+            distPath: join(
+              dirname(relPath),
+              basename(relPath, '.json')
+            )
+          }
         )
       }
     }

@@ -20,7 +20,7 @@ module.exports = class Xml {
     this.buff = loadWxmlContent(compilation, miniLoader.fileTree.getFile.bind(miniLoader.fileTree), request)
   }
 
-  writeToComponent (tags, compoennts) {
+  writeToComponent (tags, components) {
     const jsonFile = this.request.replace('.wxml', '.json')
     const jsonFileDist = this.getDistPath(jsonFile)
     const jsonStr = resolveAssetContent(jsonFile, jsonFileDist, this.compilation)
@@ -47,14 +47,22 @@ module.exports = class Xml {
         continue
       }
 
-      if (!compoennts.has(tag)) {
+      if (!components.has(tag)) {
         undfnTags.push(tag)
         continue
       }
 
       // 使用到的自定义组件写入到 json 文件
       if (!usingComponents[tag]) {
-        usingComponents[tag] = compoennts.get(tag)
+        const depComponent = components.get(tag)
+        const normalComponent = typeof depComponent !== 'string'
+        const componentPath = normalComponent ? depComponent.distPath : depComponent
+        normalComponent && this.miniLoader.fileTree.addGlobalComponent(
+          jsonFile,
+          tag,
+          depComponent.originPath
+        )
+        usingComponents[tag] = componentPath
         hasChange = true
       }
     }
