@@ -62,6 +62,7 @@ module.exports.copyMoveFiles = function copyMoveFiles (movedFiles, assets, fileT
     }
   }
 
+  const needBeRemove = []
   // TODO 对于 movedFiles 数组应该先按照依赖关系排序后再处理（不处理可能存在由于先后顺序出现 bug）
   movedFiles.forEach(({ dist, dists }) => {
     let distNeedBeRemove = true
@@ -87,7 +88,7 @@ module.exports.copyMoveFiles = function copyMoveFiles (movedFiles, assets, fileT
     })
 
     if (distNeedBeRemove) {
-      delete assets[dist]
+      needBeRemove.push(dist)
     }
   })
 
@@ -145,4 +146,6 @@ module.exports.copyMoveFiles = function copyMoveFiles (movedFiles, assets, fileT
       delete assets[meta.dist]
     }
   })
+
+  needBeRemove.forEach(dist => delete assets[dist])
 }
