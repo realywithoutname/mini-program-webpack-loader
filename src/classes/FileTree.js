@@ -180,9 +180,14 @@ class FileTree {
   addPage (pagePath, pageFiles, inSubPkg, isIndependent, entry) {
     let pagesMap = this.pages
     this.clearFiles(pagesMap.get(pagePath))
+    /**
+     * 页面不存在被使用
+     */
+    let pageFileSet = this.setFile(pageFiles, null, false, isIndependent)
 
-    let pageFileSet = this.setFile(pageFiles, this.getFile(entry), false, isIndependent)
-
+    pageFileSet.forEach(meta => {
+      meta.isPageFile = true
+    })
     pagesMap.set(pagePath, {
       isSub: inSubPkg,
       files: pageFileSet
@@ -220,7 +225,11 @@ class FileTree {
     const fileMap = this.files
     const fileMeta = fileMap.get(file)
     const { components, isIndependent } = fileMeta
-    const componentFileSet = this.setFile(componentFiles, fileMeta, false, isIndependent)
+    const entry = this.tree.get('entry')
+    /**
+     * 自定义组件只会被页面和自定义组件使用，不会被 app 使用
+     */
+    const componentFileSet = this.setFile(componentFiles, entry.has(file) ? null : fileMeta, false, isIndependent)
     let component = this.components.get(componentPath)
 
     this.clearFiles(component)
@@ -238,12 +247,15 @@ class FileTree {
       this.components.set(componentPath, component)
     }
 
+    componentFileSet.forEach(meta => {
+      meta.isComponentFile = true
+    })
+
     component.type.set(file, type)
     component.files = componentFileSet
     component.used.add(file)
 
     // 全局自定义组件不需要放在 json 文件上，应该单独管理，否则会导致解析后的入口 json 文件内容不对
-    const entry = this.tree.get('entry')
     if (entry.has(file)) {
       this.tree.get('globalComponents').set(tag, componentPath)
       return
@@ -257,6 +269,33 @@ class FileTree {
     const componentFiles = [...component.files].map(({ source }) => source)
     this.addComponent(file, tag, json, componentFiles, 'normal')
   }
+
+  /**
+   * 一个自定义组件（页面）依赖的所有自定义组件
+   * @param {*} jsonFile
+   * @param {*} usedComponents
+   */
+  addFullComponent (jsonFile, usedComponents) {
+    const meta = this.getFile(jsonFile)
+    meta.usedComponents = usedComponents
+
+    usedComponents.forEach(tag => {
+      if (!meta.components.has(tag)) {
+        let originPath = this.tree.get('globalComponents').get(tag)
+
+        if (!originPath) {
+          return
+        }
+
+        this.addGlobalComponent(
+          jsonFile,
+          tag,
+          originPath
+        )
+      }
+    })
+  }
+
   /**
    * @param {*} file
    * @param {*} depFiles
@@ -361,11 +400,7 @@ class FileTree {
     return this.getFile(dist, true)
   }
 
-  getCanUseComponents (wxmlFile, dist) {
-    if (!/\.wxml/.test(wxmlFile)) throw new Error('只能获取 wxml 文件类型可使用组件')
-
-    const jsonFile = wxmlFile.replace('.wxml', '.json')
-
+  getCanUseComponents (jsonFile, dist) {
     let usingComponents = new Map()
     let components = null
 
@@ -375,39 +410,46 @@ class FileTree {
 
     const merge = (components) => {
       for (const [tag, path] of components) {
-        if (usingComponents.has(tag) || !path) continue
+        if (usingComponents.has(tag)) continue
+        /**
+         * 抽象组件不存在对应的地址
+         */
+        if (!path) {
+          usingComponents.set(tag, {
+            type: 'generics',
+            distPath: true,
+            originPath: ''
+          })
+
+          continue
+        }
 
         const { type, json: componentJson } = this.components.get(path)
         const conponentType = type.get(jsonFile)
-
-        if (conponentType === 'generics') {
-          continue
+        const config = {
+          originPath: path,
+          type: conponentType
         }
+
         if (conponentType === 'plugin') {
-          usingComponents.set(tag, path)
-          continue
+          config.distPath = path
+        } else {
+          const relPath = relative(dist, componentJson.dist)
+          config.distPath = './' + join(
+            dirname(relPath),
+            basename(relPath, '.json')
+          )
         }
 
-        const relPath = relative(dist, componentJson.dist)
-
-        usingComponents.set(
-          tag,
-          {
-            originPath: path,
-            distPath: join(
-              dirname(relPath),
-              basename(relPath, '.json')
-            )
-          }
-        )
+        usingComponents.set(tag, config)
       }
     }
 
     merge(components)
 
-    const globalComponents = this.tree.get('globalComponents')
+    // const globalComponents = this.tree.get('globalComponents')
 
-    merge(globalComponents)
+    // merge(globalComponents)
 
     return usingComponents
   }

@@ -1,38 +1,35 @@
-const {
-  Tapable,
-  SyncHook,
-  SyncLoopHook,
-  SyncWaterfallHook
-} = require('tapable')
 const fs = require('fs')
 const readline = require('readline')
-const { dirname, join } = require('path')
+const { dirname, basename, join } = require('path')
 const { ProgressPlugin } = require('webpack')
 const { ConcatSource } = require('webpack-sources')
 
+const { relative } = require('../utils')
+
+const Wxml = require('../classes/Wxml')
 const Loader = require('../classes/Loader')
 const FileTree = require('../classes/FileTree')
 const OutPutPath = require('../classes/OutPutPath')
 const ModuleHelper = require('../classes/ModuleHelper')
 
 const FileEntryPlugin = require('./FileEntryPlugin')
-const ComponentPlugin = require('./ComponentPlugin')
 const MiniTemplatePlugin = require('./MiniTemplatePlugin')
-const WeixinProgramPlugin = require('./WeixinProgramPlugin')
 
 const { normalEntry } = require('../helpers/normal-entrys')
 const { calcCodeDep } = require('../helpers/calc-code-dep')
 const { analyzeGraph } = require('../helpers/analyze-graph')
-const { copyMoveFiles } = require('../helpers/copy-move-files')
 
 const defaultOptions = {
   extfile: true,
-  commonSubPackages: true,
+  // commonSubPackages: true,
   analyze: false,
   resources: [],
+  useFinalCallback: false,
   compilationFinish: null,
-  forPlugin: false,
+  // forPlugin: false,
   ignoreTabbar: false,
+  optimizeMainPackage: true,
+  setSubPackageCacheGroup: null,
   entry: {
     // 入口文件的配置
     // ignore
@@ -42,23 +39,16 @@ const defaultOptions = {
 
 const stdout = process.stdout
 
-module.exports = class MiniProgramPlugin extends Tapable {
+module.exports = class MiniProgramPlugin {
   constructor (options) {
-    super()
-
     this.undefinedTagTable = new Map()
+    this.definedNotUsedTable = new Map()
     this.options = Object.assign(
       defaultOptions,
       options
     )
 
     this.buildId = 0
-
-    this.hooks = {
-      beforeCompile: new SyncHook(['file']),
-      emitFile: new SyncWaterfallHook(['source', 'dists']),
-      emitWxml: new SyncLoopHook(['source', 'compilation', 'dist'])
-    }
 
     this.fileTree = new FileTree(this)
 
@@ -92,8 +82,6 @@ module.exports = class MiniProgramPlugin extends Tapable {
     this.moduleHelper = new ModuleHelper(this)
 
     new MiniTemplatePlugin(this).apply(compiler)
-    new WeixinProgramPlugin(this).apply(compiler)
-    new ComponentPlugin(this).apply(compiler)
     new ProgressPlugin({ handler: this.progress }).apply(compiler)
 
     compiler.hooks.environment.tap('MiniProgramPlugin', this.setEnvHook.bind(this))
@@ -106,13 +94,24 @@ module.exports = class MiniProgramPlugin extends Tapable {
     let watch = this.compiler.watch
     let run = this.compiler.run
     // 下面两个地方都在使用 thisMessageOutPut, 先存起来
-    const thisMessageOutPut = this.messageOutPut.bind(this)
-    this.compiler.watch = options => watch.call(this.compiler, this.compiler.options, thisMessageOutPut)
-    this.compiler.run = () => {
-      return run.call(this.compiler, function () {
-        // 按照原有的箭头函数代码，还是返回 messageOutPut 的绑定
-        return thisMessageOutPut.apply(null, arguments)
-      })
+    const thisMessageOutPut = finalCallback => {
+      const that = this
+
+      return function () {
+        return that.options.useFinalCallback && typeof finalCallback === 'function'
+          ? finalCallback.apply(null, arguments)
+          : that.messageOutPut.apply(that, arguments)
+      }
+    }
+
+    this.compiler.watch = (options, finalCallback) => watch.call(
+      this.compiler,
+      this.compiler.options,
+      thisMessageOutPut(finalCallback)
+    )
+
+    this.compiler.run = (finalCallback) => {
+      return run.call(this.compiler, thisMessageOutPut(finalCallback))
     }
   }
 
@@ -121,6 +120,7 @@ module.exports = class MiniProgramPlugin extends Tapable {
    */
   beforeCompile () {
     this.undefinedTagTable.clear()
+    this.definedNotUsedTable.clear()
     let appJson = this.FileEntryPlugin.getAppJson()
     let cachegroups = this.compiler.options.optimization.splitChunks.cacheGroups
 
@@ -175,10 +175,152 @@ module.exports = class MiniProgramPlugin extends Tapable {
             fileUsed.add(chunkName)
 
             module._usedModules = fileUsed
+
+            this.moduleHelper.addDep(chunkName, this.outputUtil.get(resourcePath))
           }
         }
       }
     }
+  }
+
+  hasChange (file) {
+    const { lastTimestamps = new Map(), compilation } = this
+    const { fileTimestamps } = compilation
+    if ((lastTimestamps.get(file) || this.startTime) < (fileTimestamps.get(file) || Infinity)) {
+      return true
+    }
+
+    return false
+  }
+  /**
+   * 获取 wxml 文件中使用到的自定义组件
+   * @param {*} compilation
+   * @param {*} callback
+   */
+  setEmitHook (chunks, callback) {
+    const { compilation } = this
+    const { assets, fileTimestamps } = compilation
+    const files = Object.keys(assets).filter(file => {
+      const { source: filePath } = this.fileTree.getFileByDist(file)
+
+      const hasChange = this.hasChange(filePath)
+      // 没有修改的文件直接不输出，减少计算
+      !hasChange && delete assets[file]
+
+      return hasChange
+    })
+
+    files.forEach(file => {
+      const { isTemplate, isWxml, source: filePath } = this.fileTree.getFileByDist(file)
+
+      /**
+         * 收集 wxml 文件中使用到的自定义组件
+         */
+      if (!isTemplate && isWxml) {
+        const wxml = new Wxml(this, compilation, filePath, file)
+        const usedComponents = wxml.usedComponents()
+
+        const jsonFile = join(
+          dirname(filePath),
+          `${basename(filePath, '.wxml')}.json`
+        )
+
+        if (fs.existsSync(jsonFile)) {
+          this.fileTree.addFullComponent(jsonFile, usedComponents)
+        }
+      }
+    })
+
+    files.forEach(dist => {
+      const meta = this.fileTree.getFileByDist(dist)
+      const { source: filePath } = meta
+
+      const sourceCode = assets[dist]
+      // 文件在哪些分包使用
+      const usedPkgs = this.moduleHelper.onlyUsedInSubPackagesReturnRoots(filePath)
+      const subRoot = this.moduleHelper.fileIsInSubPackage(filePath)
+      /**
+         * 文件在主包，并且没有被分包文件依赖，直接计算输出
+         * 否则表示文件只被分包使用，需要移动到分包内
+         */
+      if ((!subRoot && (!usedPkgs || !usedPkgs.length)) || !this.options.optimizeMainPackage) {
+        /**
+         * 计算出真实代码
+         */
+        const source = calcCodeDep(this, dist, meta, sourceCode, depFile => {
+          const distPath = this.outputUtil.get(depFile)
+
+          this.moduleHelper.addDep(dist, distPath)
+          return relative(dist, distPath)
+        })
+
+        // 删除原始的数据，以计算返回的内容为准
+        assets[dist] = source
+
+        return
+      }
+
+      /// 文件最后要输出的地址
+      let outDist = []
+
+      /**
+         * 文件在分包
+         */
+      if (subRoot) {
+        // 只需要计算依赖的文件的路径，输出路径不会被改变
+        outDist.push({
+          root: subRoot,
+          dist
+        })
+      } else {
+        // 在主包的，并且只被分包使用
+        outDist = usedPkgs.map((root) => ({
+          root,
+          dist: join(root, dist)
+        }))
+      }
+
+      // 删除源文件的输出
+      delete assets[dist]
+
+      outDist.forEach(({ dist, root }) => {
+        /**
+           * 计算出真实代码
+           */
+        const source = calcCodeDep(this, dist, meta, sourceCode, (depFile) => {
+          const distPath = this.outputUtil.get(depFile)
+          const usedPkgs = this.moduleHelper.onlyUsedInSubPackagesReturnRoots(depFile)
+          const usedInSubPackage = this.moduleHelper.fileIsInSubPackage(depFile)
+
+          // 依赖文件在主包并且被主包依赖，那么最后输出的路径不会变
+          if ((!usedInSubPackage && !usedPkgs)) {
+            this.moduleHelper.addDep(dist, distPath)
+            return relative(dist, distPath)
+          }
+
+          // 不管文件在主包还是分包，最后都会移动到这个分包
+          const sub = usedPkgs.filter((subpkgRoot) => subpkgRoot === root)
+
+          // 依赖在分包被使用，那么一定应该存在一个在这个文件所在的分包被使用
+          if (sub.length === 0) {
+            throw new Error('...')
+          }
+
+          const depDist = usedInSubPackage ? distPath : join(root, distPath)
+
+          this.moduleHelper.addDep(dist, distPath)
+          // 移动依赖文件到子包
+          return relative(dist, depDist)
+        })
+
+        // 新增文件或者替换原文件内容
+        assets[dist] = source
+      })
+    })
+
+    this.lastTimestamps = fileTimestamps
+
+    callback()
   }
 
   /**
@@ -190,69 +332,6 @@ module.exports = class MiniProgramPlugin extends Tapable {
     compilation.assets['webpack-require.js'] = new ConcatSource(
       fs.readFileSync(join(__dirname, '../lib/require.js'), 'utf8')
     )
-    callback()
-  }
-
-  setEmitHook (compilation, callback) {
-    const assets = compilation.assets
-    const { lastTimestamps = new Map() } = this
-    const timestamps = this.compilation.fileTimestamps
-    // 记录需要被移动的文件
-    const movedFiles = []
-
-    Object.keys(assets).forEach(dist => {
-      const { source: origin } = this.fileTree.getFileByDist(dist)
-
-      // 文件有更新，重新获取文件内容
-      if ((lastTimestamps.get(origin) || this.startTime) < (timestamps.get(origin) || Infinity)) {
-        const sourceCode = assets[dist]
-        /**
-         * 计算出真实代码
-         */
-        const source = calcCodeDep(this, dist, sourceCode, compilation)
-
-        // 删除原始的数据，以计算返回的内容为准
-        assets[dist] = source
-
-        // 对于 wxml 文件，触发事件处理文件
-        this.fileTree.getFileByDist(dist).isWxml &&
-        this.hooks.emitWxml.call(origin, compilation, dist)
-        /**
-         * 获取要输出的路径列表，一个文件可能因为某些原因需要输出多份
-         * [
-         *  {
-         *    dist: , // 文件输出的新地址
-         *    usedFile: , // 引起文件被输出到新地址的文件
-         *  }
-         * ]
-         */
-        const dists = this.hooks.emitFile.call(origin)
-
-        // 没有额外输出
-        if (!dists) {
-          return
-        }
-
-        // 对于输出路径和原来输出路径一致的特殊处理
-        if (Array.isArray(dists) && dists.length === 1 && dists[0].dist === dist) {
-          return
-        }
-
-        /**
-         * 记录文件被移动的位置，最后根据依赖关系移动依赖
-         * 如果 dists 为空数组，会导致这个文件直接不输出
-         */
-        movedFiles.push({
-          dist,
-          dists
-        })
-      }
-    })
-
-    copyMoveFiles(movedFiles, assets, this.fileTree)
-
-    this.lastTimestamps = timestamps
-
     callback()
   }
 
@@ -270,8 +349,23 @@ module.exports = class MiniProgramPlugin extends Tapable {
     })
   }
 
+  pushDefinedNotUsedTag (file, tags) {
+    tags.forEach(tag => {
+      const tagUsed = this.definedNotUsedTable.get(tag) || new Set()
+
+      if (!this.definedNotUsedTable.has(tag)) {
+        this.definedNotUsedTable.set(tag, tagUsed)
+      }
+
+      tagUsed.add(
+        this.outputUtil.get(file)
+      )
+    })
+  }
+
   messageOutPut (err, stats) {
     const log = (...rest) => (console.log(...rest) || true)
+    this.options.compilationFinish && this.options.compilationFinish(err, stats, this.FileEntryPlugin.getAppJson())
 
     if (err) return log(err)
 
@@ -285,21 +379,29 @@ module.exports = class MiniProgramPlugin extends Tapable {
       'Build finish'.green
     )
 
-    if (this.undefinedTagTable.size) {
+    this.logWarningTable(this.undefinedTagTable, '存在未在 json 文件中定义的组件')
+    this.logWarningTable(this.definedNotUsedTable, '存在定义后未被使用的组件')
+
+    analyzeGraph(stats, this.compilation)
+
+    this.options.analyze && fs.writeFileSync(
+      join(process.cwd(), 'analyze.json'),
+      JSON.stringify(this.moduleHelper.toJson(), null, 2)
+    )
+  }
+
+  logWarningTable (table, title) {
+    const log = (...rest) => (console.log(...rest) || true)
+
+    if (table.size) {
       log('\n')
-      log('以下文件中使用了未在 json 中定义的组件'.red)
+      log(title.red)
 
-      this.undefinedTagTable.forEach((files, tag) => {
-        if (tag === '=') return
-
+      table.forEach((files, tag) => {
         log(`[${tag.yellow}]`)
 
         files.forEach(val => log('  ', val.gray))
       })
-
-      log('\n')
     }
-
-    analyzeGraph(stats, this.compilation)
   }
 }

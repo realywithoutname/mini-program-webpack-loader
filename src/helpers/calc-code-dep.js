@@ -1,29 +1,34 @@
-const { join, dirname, basename } = require('path')
-const { relative } = require('../utils')
 const { ConcatSource } = require('webpack-sources')
+const { basename, dirname, join } = require('path')
+const { relative } = require('../utils')
+const { updateJsCode } = require('./update-code')
 const { resolveTargetPath } = require('./resolve-target-path')
 
 /**
  * 重写文件的依赖
  */
-module.exports.calcCodeDep = function calcCodeDep (miniLoader, dist, codeSource) {
-  const fileTree = miniLoader.fileTree
+module.exports.calcCodeDep = function calcCodeDep (miniLoader, dist, meta, codeSource, checkAndCalcDep) {
   const source = new ConcatSource()
-
-  const fileMeta = fileTree.getFileByDist(dist)
 
   let code = codeSource.source().toString()
 
-  let { isWxml, isWxss, isWxs, isJson, components, deps } = fileMeta
+  let { isWxml, isWxss, isWxs, isJson, isJs, components, usedComponents = [], deps } = meta
+
+  /**
+   * 更新 js 中的 require
+   */
+  if (isJs) {
+    return updateJsCode(codeSource, meta.dist, dist)
+  }
 
   /**
    * 小程序文件处理
    */
   if ((isWxml || isWxss || isWxs) && deps.size) {
     for (const dep of deps) {
-      const reg = `('|")${dep.depPath.get(fileMeta.source)}('|")`
+      const reg = `('|")${dep.depPath.get(meta.source)}('|")`
       const relativePath = resolveTargetPath(
-        relative(dist, dep.dist)
+        checkAndCalcDep ? checkAndCalcDep(dep.source) : relative(dist, dep.dist)
       )
       code = code.replaceAll(reg, `"${relativePath}"`)
     }
@@ -31,44 +36,87 @@ module.exports.calcCodeDep = function calcCodeDep (miniLoader, dist, codeSource)
 
   /**
    * json 文件处理，主要处理自定义组件的 json 文件
-   * 计算自定义组件的相对路径
    */
   if (isJson && components.size) {
     code = JSON.parse(code)
 
-    for (const [key, value] of components) {
-      const { usingComponents, componentGenerics } = code
-      // 抽象组件的自定义组件路径可能为空的
-      if (!value) {
-        componentGenerics[key] = true
-        continue
-      }
-      const { type, json: jsonFileMeta } = fileTree.components.get(value)
-      const componentType = type.get(fileMeta.source)
-      // 插件不需要处理
-      if (componentType === 'plugin') {
-        usingComponents[key] = value
+    const canUseComponents = miniLoader.fileTree.getCanUseComponents(meta.source, dist)
+    const { usingComponents = {}, componentGenerics = {} } = code
+
+    /**
+     * 统计定义未使用的组件
+     */
+    const definedComponents = [
+      ...Object.keys(usingComponents),
+      ...Object.keys(componentGenerics)
+    ].reduce((res, key) => {
+      res[key] = 0
+      return res
+    }, {})
+    /**
+     * 统计未定义的组件
+     */
+    const ignoredComponents = []
+    for (const componentName of usedComponents) {
+      const component = canUseComponents.get(componentName)
+
+      delete definedComponents[componentName]
+
+      if (!component) {
+        ignoredComponents.push(componentName)
         continue
       }
 
-      const relPath = relative(dist, jsonFileMeta.dist)
-      const componentPath = './' + join(
-        dirname(relPath),
-        basename(relPath, '.json')
+      // 插件使用插件地址
+      if (component.type === 'plugin') {
+        usingComponents[componentName] = component.distPath
+        continue
+      }
+
+      // 无默认值抽象组件
+      if (component.type === 'generics' && component.distPath === true) {
+        componentGenerics[componentName] = true
+        continue
+      }
+
+      /**
+       * 普通自定义组件和有默认值的抽象组件，先计算依赖的相对路径
+       * 如果有自定义的计算方法，则使用自定义计算方法。
+       */
+      let distPath = checkAndCalcDep && checkAndCalcDep(component.originPath)
+
+      // 自定义计算方法只是给了相对路径，需要去掉 .json
+      distPath = !distPath ? component.distPath : (
+        './' + join(
+          dirname(distPath),
+          basename(distPath, '.json')
+        )
       )
 
-      if (componentType === 'normal') {
-        usingComponents[key] = componentPath
-      }
-
-      if (componentType === 'generics') {
-        if (value) {
-          componentGenerics[key] = {
-            default: componentPath
-          }
+      if (component.type !== 'generics') {
+        usingComponents[componentName] = distPath
+      } else {
+        componentGenerics[componentName] = {
+          default: distPath
         }
       }
     }
+
+    const definedAndNotUsed = Object.keys(definedComponents)
+
+    definedAndNotUsed.forEach(componentName => {
+      usingComponents[componentName] && delete usingComponents[componentName]
+      componentGenerics[componentName] && delete componentGenerics[componentName]
+    })
+
+    miniLoader.pushUndefinedTag(meta.source, ignoredComponents)
+    miniLoader.pushDefinedNotUsedTag(meta.source, definedAndNotUsed)
+
+    /**
+     * 有些自定义组件一开始没有定义 componentGenerics，usingComponents
+     */
+    !code.usingComponents && Object.keys(usingComponents).length && (code.usingComponents = usingComponents)
+    !code.componentGenerics && Object.keys(componentGenerics).length && (code.componentGenerics = componentGenerics)
 
     code = JSON.stringify(code, null, 2)
   }

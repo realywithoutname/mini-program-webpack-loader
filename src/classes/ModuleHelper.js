@@ -5,8 +5,8 @@ module.exports = class ModuleHelper {
     this.miniLoader = miniLoader
     this.fileTree = miniLoader.fileTree
     this.fileEntryPlugin = miniLoader.FileEntryPlugin
+    this.chunks = new Map()
     this.deps = new Map()
-    this.modules = new Map()
   }
 
   /**
@@ -15,19 +15,49 @@ module.exports = class ModuleHelper {
    * @param {*} dep
    * @param {*} chunkName
    */
-  addUser (module, chunkName) {
-    const resource = module.resource
-    let chunks = this.deps.get(resource)
-    if (!chunks) {
-      chunks = new Set()
-      this.deps.set(resource, chunks)
+  addDep (chunkName, dep) {
+    let deps = this.chunks.get(chunkName)
+    if (!deps) {
+      deps = new Set()
+      this.chunks.set(chunkName, deps)
     }
 
-    chunks.add(chunkName)
+    let used = this.deps.get(dep)
 
-    module.beUsedChunks = chunks
+    if (!used) {
+      used = new Set()
+      this.deps.set(dep, used)
+    }
 
-    this.modules.set(resource, module)
+    used.add(chunkName)
+    deps.add(dep)
+  }
+
+  tree () {
+    let tree = {}
+
+    for (const [key, val] of this.chunks) {
+      tree[key] = [...val]
+    }
+
+    return tree
+  }
+
+  toUsed () {
+    let tree = {}
+
+    for (const [key, val] of this.deps) {
+      tree[key] = [...val]
+    }
+
+    return tree
+  }
+
+  toJson () {
+    return {
+      chunks: this.tree(),
+      deps: this.toUsed()
+    }
   }
 
   getJsonFile (file) {
@@ -60,8 +90,6 @@ module.exports = class ModuleHelper {
   }
 
   onlyUsedInSubPackagesReturnRoots (file) {
-    if (!this.isComponentFile(file)) return false
-
     const { packages } = this.fileEntryPlugin
     const reg = new RegExp(
       Object.keys(packages).filter(root => !!root).map(root => `/${root}/`).join('|')
@@ -71,20 +99,57 @@ module.exports = class ModuleHelper {
     const { used } = fileMeta
     const roots = []
 
-    let isTrue = false
-    for (const { source } of used) {
-      const matched = source.match(reg)
-      if (matched) {
-        roots.push({
-          usedFile: source, // 在分包中这个文件被使用
-          root: matched[0].substr(1)
-        })
-        continue
-      }
-      isTrue = true
+    /**
+     * 对于没有被使用的自定义组件应该被删除
+     */
+    if (!used.size && fileMeta.isComponentFile) {
+      return roots
     }
 
-    return !isTrue && roots
+    // 假设该自定义组件只是在分包使用
+    let usedInMainPackage = false
+    for (const meta of used) {
+      const stack = [meta]
+      // 标记使用这个文件的单个文件是不是在分包。如果是在分包则该文件也在这个分包使用
+      let usedInSubPackages = false
+      while (stack.length && !usedInMainPackage) {
+        const meta = stack.pop()
+        const { source, used } = meta
+        const matched = source.match(reg)
+        if (matched) {
+          roots.push(matched[0].substr(1))
+          usedInSubPackages = true
+          continue
+        }
+        /**
+         * 没有被使用的自定义组件（全局自定义组件），可以不用管
+         * 设置 usedInSubPackages 为 true
+         */
+        if (!used.size && meta.isComponentFile) {
+          usedInSubPackages = true
+          continue
+        } else if (!used.size) {
+          // 非自定义组件文件，没有被使用，说明是顶级文件，一定在主包
+          usedInMainPackage = true
+          break
+        }
+
+        /**
+         * 其他如果 used 还有则继续向上判断
+         * 如果 used.size 为 0，则表示页面，页面则如果是分包会被 match 到
+         */
+        stack.unshift(...used)
+        usedInSubPackages = false
+      }
+
+      // 如果有不在分包中使用，则表示在主包有使用
+      if (!usedInSubPackages) {
+        usedInMainPackage = true
+        break
+      }
+    }
+
+    return !usedInMainPackage && [...new Set(roots)]
   }
 
   /**
@@ -97,6 +162,7 @@ module.exports = class ModuleHelper {
       Object.keys(packages).filter(root => !!root).map(root => `/${root}/`).join('|')
     )
 
-    return reg.test(file)
+    let matched = file.match(reg)
+    return matched ? matched[0].substr(1) : false
   }
 }
