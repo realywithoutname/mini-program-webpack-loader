@@ -6,7 +6,7 @@
  */
 const { join } = require('path')
 const { existsSync } = require('fs')
-const EXTS = ['.js', '.json', '.wxml', '.wxss', '.wxs', '.scss', '.pcss', '.less']
+const EXTS = ['.js', '.ts', '.json', '.wxml', '.wxss', '.wxs', '.scss', '.pcss', '.less']
 
 exports.getFiles = (base, path = '', exts) => {
   let files = []

@@ -10,11 +10,6 @@
   $ npm i mini-program-webpack-loader --dev
 ```
 
-## 示例
-
-[小程序插件项目和普通小程序项目打包示例](https://github.com/realywithoutname/mini-loader-plugin-demo)，插件开发可以 clone 该仓库进行开发。
-普通小程序项目可以使用其中的 `build/webpack.comfig.mini.js` 配置来配置自己的项目，也可以直接使用这个仓库作为模板进行开发。
-
 ## 介绍
 
 该工具主要解决小程序难以集成更多的成熟工具的问题。其次支持多个小程序项目共建。
@@ -68,13 +63,48 @@
     </tr>
     <tr>
       <td colspan="1">
-        <p>commonSubPackages</p>
-      </td>
-      <td colspan="1">`Boolean`</td>
+        <span>`ignoreTabbar`</span>
+        <br data-mce-bogus="1"></td>
       <td colspan="1">
-        <p>自动把 subpackages 中子包独自使用的 js 文件打包到子包内。默认值为
-          <span style="color: #ce9178;" data-mce-style="color: #ce9178;">`true`</span></p>
+        <span>`Boolean`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">是否把 tabbar 中的图片添加到构建，考虑到很多场景除了 tabbar 资源，可能还存在其他资源不能被插件索引到，可以通过 copy 插件复制资源，所以插件默认不会构建 tabbar 依赖的图片内容</td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <span>`optimizeMainPackage`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">
+        <span>`Boolean`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">是否优化主包体积。在一些场景下，组件只在多个分包使用，于是组件只能放到主包内，插件提供配置，自动拷贝这些组件到分包内，以减小主包体积，默认值为 `true`</td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <p>setSubPackageCacheGroup(miniLoader, appJson)</p>
       </td>
+      <td colspan="1">`Function`</td>
+      <td colspan="1">
+        <p>根据最后输出的 `app.json` 设置 `cacheGroup`</p>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <span>`useFinalCallback`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">
+        <span>`Boolean`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">是否使用自定义的构建完成回调，默认使用插件内置的回调来输出构建信息。</td>
+    </tr>
+    <tr>
+      <td colspan="1">
+        <span>`compilationFinish(err, stat, appJson)`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">
+        <span>`Function`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">打包完成后回调</td>
     </tr>
     <tr>
       <td colspan="1">
@@ -177,33 +207,6 @@
         <span>`Array`</span>
         <br data-mce-bogus="1"></td>
       <td colspan="1">不加载对应入口文件 `usingConponents` 字段对应组件</td>
-    </tr>
-    <tr>
-      <td colspan="1">
-        <span>`beforeEmit(compilation, miniLoader)`</span>
-        <br data-mce-bogus="1"></td>
-      <td colspan="1">
-        <span>`Function`</span>
-        <br data-mce-bogus="1"></td>
-      <td colspan="1">打包完成，输出到目录前回调，你可以在这里对内容进行最后的修改</td>
-    </tr>
-    <tr>
-      <td colspan="1">
-        <span>`compilationFinish(err, stat, appJson)`</span>
-        <br data-mce-bogus="1"></td>
-      <td colspan="1">
-        <span>`Function`</span>
-        <br data-mce-bogus="1"></td>
-      <td colspan="1">打包完成后回调</td>
-    </tr>
-    <tr>
-      <td colspan="1">
-        <span>`forPlugin`</span>
-        <br data-mce-bogus="1"></td>
-      <td colspan="1">
-        <span>`Boolean`</span>
-        <br data-mce-bogus="1"></td>
-      <td colspan="1">以插件方式构建，入口文件和普通 app.json 一致</td>
     </tr>
   </tbody>
 </table>

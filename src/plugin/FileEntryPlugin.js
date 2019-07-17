@@ -333,11 +333,11 @@ module.exports = class FileEntryPlugin extends Tapable {
   getEntryPackages (entry) {
     const dir = dirname(entry)
     const fileName = basename(entry, '.json')
-    const exts = ['.wxss', '.scss']
+    const exts = ['.wxss', '.scss', '.less']
 
     if (!this.mainEntry) {
       this.mainEntry = entry
-      exts.push('.js')
+      exts.push('.js', '.ts')
     }
     const files = getFiles(dir, fileName, exts)
 
@@ -454,7 +454,7 @@ module.exports = class FileEntryPlugin extends Tapable {
 
     files = flattenDeep(files)
 
-    files.forEach(file => /\.js$/.test(file) ? scriptFiles.push(file) : assetFiles.push(file))
+    files.forEach(file => /\.[j|t]s$/.test(file) ? scriptFiles.push(file) : assetFiles.push(file))
 
     this.addAssetsEntry(assetFiles)
     this.addScriptEntry(scriptFiles)
