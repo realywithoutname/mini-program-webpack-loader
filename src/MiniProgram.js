@@ -157,7 +157,7 @@ module.exports = class MiniProgam {
 
     files = flattenDeep(files)
 
-    files.forEach(file => /\.js$/.test(file) ? scriptFiles.push(file) : assetFiles.push(file))
+    files.forEach(file => /\.[j|t]s$/.test(file) ? scriptFiles.push(file) : assetFiles.push(file))
 
     this.addAssetsEntry(context, assetFiles)
     this.addScriptEntry(context, scriptFiles)
@@ -246,7 +246,7 @@ module.exports = class MiniProgam {
     let entrys = [
       getFiles(this.mainContext, 'project.config', ['.json']), // project.config.json
       extfile === true ? getFiles(this.mainContext, 'ext', ['.json']) : [], // ext.json 只有 extfile 为 true 的时候才加载主包的 ext.json
-      getFiles(this.mainContext, this.mainName, ['.js']) // 打包主入口对应的 js 文件
+      getFiles(this.mainContext, this.mainName, ['.js', '.ts']) // 打包主入口对应的 js 文件
     ]
 
     // tabBar icons
