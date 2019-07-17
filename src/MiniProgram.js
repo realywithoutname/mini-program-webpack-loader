@@ -223,7 +223,7 @@ module.exports = class MiniProgam {
       /**
        * 入口文件只打包对应的 wxss 文件
        */
-      let entryFiles = getFiles(itemContext, fileName, ['.wxss'])
+      let entryFiles = getFiles(itemContext, fileName, ['.wxss', '.scss', '.less'])
 
       /**
        * 添加所有与这个 json 文件相关的 page 文件和 app 文件到编译中
