@@ -274,10 +274,17 @@ module.exports = class MiniProgramPlugin {
         })
       } else {
         // 在主包的，并且只被分包使用
-        outDist = usedPkgs.map((root) => ({
-          root,
-          dist: join(root, dist)
-        }))
+        outDist = usedPkgs.map((root) => {
+          let to = join(root, dist)
+          // 如果输出文件原本就存在
+          if (assets[to]) {
+            throw new Error(`分包 ${root} 内存在和 ${dist} 移动后一样的文件，需要修改其中一处后才能构建`)
+          }
+          return {
+            root,
+            dist: to
+          }
+        })
       }
 
       // 删除源文件的输出
