@@ -28,6 +28,7 @@ const defaultOptions = {
   compilationFinish: null,
   // forPlugin: false,
   ignoreTabbar: false,
+  optimizeIgnoreDirs: [],
   optimizeMainPackage: true,
   setSubPackageCacheGroup: null,
   entry: {
@@ -239,11 +240,12 @@ module.exports = class MiniProgramPlugin {
       // 文件在哪些分包使用
       const usedPkgs = this.moduleHelper.onlyUsedInSubPackagesReturnRoots(filePath)
       const subRoot = this.moduleHelper.fileIsInSubPackage(filePath)
+      const ignoreOptimizeFile = this.options.optimizeIgnoreDirs.filter(dirName => dist.match(dirName)).length > 0
       /**
          * 文件在主包，并且没有被分包文件依赖，直接计算输出
          * 否则表示文件只被分包使用，需要移动到分包内
          */
-      if ((!subRoot && (!usedPkgs || !usedPkgs.length)) || !this.options.optimizeMainPackage) {
+      if ((!subRoot && (!usedPkgs || !usedPkgs.length)) || !this.options.optimizeMainPackage || ignoreOptimizeFile) {
         /**
          * 计算出真实代码
          */
