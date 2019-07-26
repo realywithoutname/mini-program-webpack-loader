@@ -301,8 +301,10 @@ module.exports = class MiniProgramPlugin {
           const usedPkgs = this.moduleHelper.onlyUsedInSubPackagesReturnRoots(depFile)
           const usedInSubPackage = this.moduleHelper.fileIsInSubPackage(depFile)
 
+          const ignoreOptimizeFile = this.options.optimizeIgnoreDirs.filter(dirName => depFile.match(dirName)).length > 0
+
           // 依赖文件在主包并且被主包依赖，那么最后输出的路径不会变
-          if ((!usedInSubPackage && !usedPkgs)) {
+          if ((!usedInSubPackage && !usedPkgs) || ignoreOptimizeFile) {
             this.moduleHelper.addDep(dist, distPath)
             return relative(dist, distPath)
           }
@@ -374,11 +376,15 @@ module.exports = class MiniProgramPlugin {
 
   messageOutPut (err, stats) {
     const log = (...rest) => (console.log(...rest) || true)
-    this.options.compilationFinish && this.options.compilationFinish(err, stats, this.FileEntryPlugin.getAppJson())
+    this.options.compilationFinish && this.options.compilationFinish(err, stats, this.FileEntryPlugin.getAppJson(), this)
 
     if (err) return log(err)
 
     const { startTime, endTime } = stats
+    const {
+      warnings = [],
+      errors = []
+    } = stats.compilation
 
     readline.clearLine(process.stdout)
     readline.cursorTo(process.stdout, 0)
@@ -392,6 +398,14 @@ module.exports = class MiniProgramPlugin {
     this.logWarningTable(this.definedNotUsedTable, '存在定义后未被使用的组件')
 
     analyzeGraph(stats, this.compilation)
+
+    if (warnings.length) {
+      this.logError(warnings)
+    }
+
+    if (errors.length) {
+      this.logError(errors)
+    }
 
     this.options.analyze && fs.writeFileSync(
       join(process.cwd(), 'analyze.json'),
@@ -412,5 +426,24 @@ module.exports = class MiniProgramPlugin {
         files.forEach(val => log('  ', val.gray))
       })
     }
+  }
+
+  logError (messages) {
+    messages.forEach((err) => {
+      if (!err.module || !err.module.id) {
+        return console.log(err)
+      }
+
+      let message = err.message.split(/\n\n|\n/)
+      let mainMessage = message[0] || ''
+      let lc = mainMessage.match(/\((\d+:\d+)\)/)
+      lc = lc ? lc[1] : '1:1'
+
+      console.log('Error in file', (err.module && err.module.id + ':' + lc).red)
+      console.log(mainMessage.gray)
+      message[1] && console.log(message[1].gray)
+      message[2] && console.log(message[2].gray)
+      console.log('')
+    })
   }
 }

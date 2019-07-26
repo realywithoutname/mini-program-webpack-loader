@@ -1,8 +1,10 @@
+const target = process.env.TARGET || 'wx'
 const { ConcatSource } = require('webpack-sources')
 const { basename, dirname, join } = require('path')
 const { relative } = require('../utils')
 const { updateJsCode } = require('./update-code')
 const { resolveTargetPath } = require('./resolve-target-path')
+const { isNativeTag } = require(`../platform/${target}/wxml`)
 
 /**
  * 重写文件的依赖
@@ -105,6 +107,11 @@ module.exports.calcCodeDep = function calcCodeDep (miniLoader, dist, meta, codeS
     const definedAndNotUsed = Object.keys(definedComponents)
 
     definedAndNotUsed.forEach(componentName => {
+      if (isNativeTag(componentName)) {
+        miniLoader.compilation.errors.push(
+          new Error(`${dist} 定义了原生组件 ${componentName}，修改后重试`)
+        )
+      }
       usingComponents[componentName] && delete usingComponents[componentName]
       componentGenerics[componentName] && delete componentGenerics[componentName]
     })
