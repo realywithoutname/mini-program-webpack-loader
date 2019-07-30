@@ -91,6 +91,12 @@ module.exports = class ModuleHelper {
 
   onlyUsedInSubPackagesReturnRoots (file) {
     const { packages } = this.fileEntryPlugin
+    // 如果只有一个且是主包，直接跳过
+    const firstPackage = packages[0] || {};
+    if (Object.keys(packages).length === 1 && !firstPackage.root) {
+      return [];
+    }
+
     const reg = new RegExp(
       Object.keys(packages).filter(root => !!root).map(root => `/${root}/`).join('|')
     )
