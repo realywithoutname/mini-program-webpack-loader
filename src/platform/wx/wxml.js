@@ -46,6 +46,7 @@ const NATIVE_TAGS = new Set([
   'picker-view-column',
   'swiper-item',
   'radio',
+  'radio-group',
   'slider',
   'switch',
   'textarea',
