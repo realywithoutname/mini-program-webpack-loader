@@ -54,9 +54,9 @@ module.exports.pathInSubpackage = function (path) {
 }
 
 /**
-   * 判断所给的路径集合是不是在同一个包内
-   * @param {Array} paths 路径列表
-   */
+ * 判断所给的路径集合是不是在同一个包内
+ * @param {Array} paths 路径列表
+ */
 module.exports.pathsInSamePackage = function (paths) {
   // 取第一个路径，获取子包 root，然后和其他路径对比
   let firstPath = paths[0]
@@ -76,9 +76,9 @@ module.exports.pathsInSamePackage = function (paths) {
 }
 
 /**
-   * 判断列表内数据是不是在同一个目录下
-   * @param {*} paths
-   */
+ * 判断列表内数据是不是在同一个目录下
+ * @param {*} paths
+ */
 module.exports.pathsInSameFolder = function (paths) {
   let firstPath = paths[0]
   let folder = firstPath.split('/')[0]

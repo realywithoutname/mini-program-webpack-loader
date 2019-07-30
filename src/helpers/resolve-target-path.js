@@ -19,6 +19,10 @@ const CONFIG = {
 
     TPcss (path) {
       return path.replace('.pcss', '.acss')
+    },
+
+    TLess (path) {
+      return path.replace('.less', '.acss')
     }
   },
 
@@ -29,11 +33,15 @@ const CONFIG = {
 
     TPcss (path) {
       return path.replace('.pcss', '.wxss')
+    },
+
+    TLess (path) {
+      return path.replace('.less', '.wxss')
     }
   }
 }
 
-module.exports.toTargetPath = function (file) {
+module.exports.resolveTargetPath = function (file) {
   let target = process.env.TARGET || 'wx'
   let TARGET = CONFIG[target]
   let ext = extname(file)

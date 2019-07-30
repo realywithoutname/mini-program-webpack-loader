@@ -1,11 +1,9 @@
-const utils = require('../utils')
-const { toTargetPath } = require('./path')
+const { resolveTargetPath } = require('./resolve-target-path')
 
-module.exports.getAssetContent = function (file, compilation) {
-  let distPath = utils.getDistPath(file)
+module.exports.resolveAssetContent = function (file, distPath, compilation) {
   let { assets, cache } = compilation
 
-  distPath = toTargetPath(distPath)
+  distPath = resolveTargetPath(distPath)
 
   if (assets[distPath]) return assets[distPath].source().toString()
 
