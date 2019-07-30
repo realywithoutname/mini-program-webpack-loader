@@ -78,7 +78,7 @@ module.exports = class ModuleHelper {
   moduleOnlyUsedBySubPackage (module, root) {
     const file = module.resource
     if (!/\.js$/.test(file) || module.isEntryModule()) return false
-    if (!module._usedModules) throw new Error('非插件提供的 module 不支持')
+    if (!module._usedModules) return false
 
     const users = module._usedModules
 
