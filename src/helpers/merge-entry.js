@@ -1,7 +1,8 @@
 module.exports.mergeEntrys = function (entrysCode, mainEntry) {
   let code = {
     preloadRule: {},
-    plugins: {}
+    plugins: {},
+    subPackages: []
   }
 
   for (const key in entrysCode) {

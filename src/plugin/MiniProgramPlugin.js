@@ -201,17 +201,14 @@ module.exports = class MiniProgramPlugin {
   setEmitHook (chunks, callback) {
     const { compilation } = this
     const { assets, fileTimestamps } = compilation
-    const files = Object.keys(assets).filter(file => {
+    const changeFiles = Object.keys(assets).filter(file => {
       const { source: filePath } = this.fileTree.getFileByDist(file)
 
       const hasChange = this.hasChange(filePath)
       // 没有修改的文件直接不输出，减少计算
-      !hasChange && delete assets[file]
-
       return hasChange
     })
-
-    files.forEach(file => {
+    changeFiles.forEach(file => {
       const { isTemplate, isWxml, source: filePath } = this.fileTree.getFileByDist(file)
 
       /**
@@ -232,7 +229,7 @@ module.exports = class MiniProgramPlugin {
       }
     })
 
-    files.forEach(dist => {
+    changeFiles.forEach(dist => {
       const meta = this.fileTree.getFileByDist(dist)
       const { source: filePath } = meta
 
