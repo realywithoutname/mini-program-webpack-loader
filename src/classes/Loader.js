@@ -1,7 +1,7 @@
 // const fs = require('fs')
 const path = require('path')
 const { LOADER_ACCEPT_FILE_EXTS } = require('../config/constant')
-
+const minisizeWxml = require('../helpers/html-mini-loader')
 const isInvaildExt = ext => LOADER_ACCEPT_FILE_EXTS.indexOf(ext) === -1
 
 class MiniLoader {
@@ -20,6 +20,11 @@ class MiniLoader {
     this.resolve = (context, request) => new Promise((resolve, reject) => {
       loader.resolve(context, request, (err, result) => err ? reject(err) : resolve(result))
     })
+
+    // wxml 压缩
+    if (this.fileMeta.isWxml) {
+      this.source = minisizeWxml(code, this.fileMeta)
+    }
 
     /**
      * 返回最终这个文件的内容

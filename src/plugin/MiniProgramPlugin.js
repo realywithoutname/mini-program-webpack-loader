@@ -18,6 +18,7 @@ const MiniTemplatePlugin = require('./MiniTemplatePlugin')
 const { normalEntry } = require('../helpers/normal-entrys')
 const { calcCodeDep } = require('../helpers/calc-code-dep')
 const { analyzeGraph } = require('../helpers/analyze-graph')
+const { getContentHash } = require('../helpers/calc-content-hash')
 
 const defaultOptions = {
   extfile: true,
@@ -184,14 +185,15 @@ module.exports = class MiniProgramPlugin {
     }
   }
 
-  hasChange (file) {
-    const { lastTimestamps = new Map(), compilation } = this
-    const { fileTimestamps } = compilation
-    if ((lastTimestamps.get(file) || this.startTime) < (fileTimestamps.get(file) || Infinity)) {
-      return true
+  hasChange (fileMeta, source) {
+    const contentHash = getContentHash(this.compilation, source)
+    if (fileMeta.hash === contentHash) {
+      return false
     }
 
-    return false
+    fileMeta.updateHash(contentHash)
+
+    return true
   }
   /**
    * 获取 wxml 文件中使用到的自定义组件
@@ -201,13 +203,20 @@ module.exports = class MiniProgramPlugin {
   setEmitHook (chunks, callback) {
     const { compilation } = this
     const { assets, fileTimestamps } = compilation
-    const changeFiles = Object.keys(assets).filter(file => {
-      const { source: filePath } = this.fileTree.getFileByDist(file)
 
-      const hasChange = this.hasChange(filePath)
+    const changeFiles = Object.keys(assets).filter(file => {
+      const fileMeta = this.fileTree.getFileByDist(file)
+
+      const hasChange = this.hasChange(fileMeta, assets[file])
+
+      if (!hasChange) {
+        delete assets[file]
+      }
+
       // 没有修改的文件直接不输出，减少计算
       return hasChange
     })
+
     changeFiles.forEach(file => {
       const { isTemplate, isWxml, source: filePath } = this.fileTree.getFileByDist(file)
 
@@ -373,7 +382,13 @@ module.exports = class MiniProgramPlugin {
 
   messageOutPut (err, stats) {
     const log = (...rest) => (console.log(...rest) || true)
-    this.options.compilationFinish && this.options.compilationFinish(err, stats, this.FileEntryPlugin.getAppJson(), this)
+
+    try {
+      this.options.compilationFinish &&
+      this.options.compilationFinish(err, stats, this.FileEntryPlugin.getAppJson(), this)
+    } catch (e) {
+      stats.compilation.errors.push(e)
+    }
 
     if (err) return log(err)
 
