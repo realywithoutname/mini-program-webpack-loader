@@ -270,14 +270,14 @@ module.exports = class FileEntryPlugin extends Tapable {
     const files = []
 
     Object.keys(this.packages).forEach((root) => {
-      const { pages, isIndependent, entry } = this.packages[root]
+      const { pages, independent, entry } = this.packages[root]
       pages.forEach(page => {
         // TODO 可以更改页面的路径
         const pageFiles = getFiles('', page)
 
         pageFiles.forEach(file => !this.miniLoader.fileTree.has(file) && files.push(file))
 
-        this.miniLoader.fileTree.addPage(page, pageFiles, !!root, isIndependent, entry)
+        this.miniLoader.fileTree.addPage(page, pageFiles, !!root, independent, entry)
       })
     })
 
@@ -354,12 +354,12 @@ module.exports = class FileEntryPlugin extends Tapable {
   mergePackges (entry, newPackages) {
     const context = dirname(entry)
     const pkgs = this.packages
-    newPackages.forEach(({ root, pages, name, independent: isIndependent }) => {
+    newPackages.forEach(({ root, pages, name, independent }) => {
       const pkg = pkgs[root] = pkgs[root] || { }
 
       pages = pages.map(page => join(context, root, page))
       if (!isEmpty(pkg)) {
-        console.assert(Boolean(pkg.isIndependent) === Boolean(isIndependent), `独立分包不支持于非独立分包合并: ${root}`)
+        console.assert(Boolean(pkg.independent) === Boolean(independent), `独立分包不支持于非独立分包合并: ${root}`)
 
         pkgs[root].pages = [
           ...new Set([
@@ -375,7 +375,7 @@ module.exports = class FileEntryPlugin extends Tapable {
         name,
         root,
         entry,
-        isIndependent
+        independent
       }
     })
   }
