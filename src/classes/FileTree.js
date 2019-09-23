@@ -177,13 +177,13 @@ class FileTree {
    * @param {*} pageFiles
    * @param {*} isSubPkg
    */
-  addPage (pagePath, pageFiles, inSubPkg, isIndependent, entry) {
+  addPage (pagePath, pageFiles, inSubPkg, independent, entry) {
     let pagesMap = this.pages
     this.clearFiles(pagesMap.get(pagePath))
     /**
      * 页面不存在被使用
      */
-    let pageFileSet = this.setFile(pageFiles, null, false, isIndependent)
+    let pageFileSet = this.setFile(pageFiles, null, false, independent)
 
     pageFileSet.forEach(meta => {
       meta.isPageFile = true
@@ -224,12 +224,12 @@ class FileTree {
   addComponent (file, tag, componentPath, componentFiles, type) {
     const fileMap = this.files
     const fileMeta = fileMap.get(file)
-    const { components, isIndependent } = fileMeta
+    const { components, independent } = fileMeta
     const entry = this.tree.get('entry')
     /**
      * 自定义组件只会被页面和自定义组件使用，不会被 app 使用
      */
-    const componentFileSet = this.setFile(componentFiles, entry.has(file) ? null : fileMeta, false, isIndependent)
+    const componentFileSet = this.setFile(componentFiles, entry.has(file) ? null : fileMeta, false, independent)
     let component = this.components.get(componentPath)
 
     this.clearFiles(component)
@@ -334,9 +334,9 @@ class FileTree {
    * @param {*} files 要添加的文件
    * @param {*} user 文件使用者
    * @param {*} ignore 是否检查输出路径
-   * @param {*} isIndependent 是否在独立分包
+   * @param {*} independent 是否在独立分包
    */
-  setFile (files, user, ignore, isIndependent, dist) {
+  setFile (files, user, ignore, independent, dist) {
     let fileMap = this.files
     let fileSet = new Set()
 
@@ -356,7 +356,7 @@ class FileTree {
 
       user && meta.used.add(user)
       meta.id = ++this.id
-      meta.isIndependent = isIndependent
+      meta.independent = independent
 
       // 允许引用不同的 node_modules 下的文件
       if (!ignore && distFile && (!/node_modules/.test(distFile) || !/node_modules/.test(file))) {
