@@ -354,7 +354,7 @@ module.exports = class FileEntryPlugin extends Tapable {
   mergePackges (entry, newPackages) {
     const context = dirname(entry)
     const pkgs = this.packages
-    newPackages.forEach(({ root, pages, name, independent }) => {
+    newPackages.forEach(({ root, pages, name, independent, plugins }) => {
       const pkg = pkgs[root] = pkgs[root] || { }
 
       pages = pages.map(page => join(context, root, page))
@@ -375,7 +375,8 @@ module.exports = class FileEntryPlugin extends Tapable {
         name,
         root,
         entry,
-        independent
+        independent,
+        plugins,
       }
     })
   }
