@@ -1,4 +1,5 @@
 const { util: { createHash } } = require('webpack')
+const { RawSource } = require('webpack-sources')
 
 module.exports.getContentHash = function getContentHash (compilation, source) {
   const { outputOptions } = compilation
@@ -9,6 +10,10 @@ module.exports.getContentHash = function getContentHash (compilation, source) {
   } = outputOptions
 
   const hash = createHash(hashFunction)
+
+  if (source && typeof source.source) {
+    source = new RawSource(source.source())
+  }
 
   source.updateHash(hash)
 

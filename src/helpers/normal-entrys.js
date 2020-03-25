@@ -27,9 +27,13 @@ exports.normalEntry = function normalEntry (context = process.cwd(), entry = [])
     })
   } else if (typeof entry === 'object' && entry !== null) {
     Object.keys(entry).forEach((key) => {
-      if (/\.json/.test(entry[key])) {
-        miniEntrys.push(getEntry(entry[key]))
-      }
+      const _entry = Array.isArray(entry[key]) ? entry[key] : [entry[key]]
+
+      _entry.forEach(entry => {
+        if (/\.json/.test(entry)) {
+          miniEntrys.push(getEntry(entry))
+        }
+      })
     })
   }
 

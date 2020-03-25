@@ -72,6 +72,15 @@
     </tr>
     <tr>
       <td colspan="1">
+        <span>`silently`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">
+        <span>`Boolean`</span>
+        <br data-mce-bogus="1"></td>
+      <td colspan="1">是否输出构建信息，默认 `false`，输出构建信息</td>
+    </tr>
+    <tr>
+      <td colspan="1">
         <span>`optimizeMainPackage`</span>
         <br data-mce-bogus="1"></td>
       <td colspan="1">

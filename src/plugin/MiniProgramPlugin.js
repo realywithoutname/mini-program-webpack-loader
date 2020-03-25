@@ -24,6 +24,7 @@ const defaultOptions = {
   extfile: true,
   // commonSubPackages: true,
   analyze: false,
+  silently: false,
   resources: [],
   useFinalCallback: false,
   compilationFinish: null,
@@ -84,7 +85,7 @@ module.exports = class MiniProgramPlugin {
     this.moduleHelper = new ModuleHelper(this)
 
     new MiniTemplatePlugin(this).apply(compiler)
-    new ProgressPlugin({ handler: this.progress }).apply(compiler)
+    !this.options.silently && new ProgressPlugin({ handler: this.progress }).apply(compiler)
 
     compiler.hooks.environment.tap('MiniProgramPlugin', this.setEnvHook.bind(this))
     compiler.hooks.compilation.tap('MiniProgramPlugin', this.setCompilation.bind(this))
@@ -393,31 +394,34 @@ module.exports = class MiniProgramPlugin {
     if (err) return log(err)
 
     const { startTime, endTime } = stats
-    const {
-      warnings = [],
-      errors = []
-    } = stats.compilation
 
-    readline.clearLine(process.stdout)
-    readline.cursorTo(process.stdout, 0)
-    stdout.write(
-      `[${(new Date()).toLocaleTimeString().gray}] [${('id ' + ++this.buildId).gray}] ` +
-      ((endTime - startTime) / 1000).toFixed(2) + 's ' +
-      'Build finish'.green
-    )
+    if (!this.options.silently) {
+      // @ts-ignore
+      readline.clearLine(process.stdout)
+      readline.cursorTo(process.stdout, 0)
+      stdout.write(
+        `[${(new Date()).toLocaleTimeString().gray}] [${('id ' + ++this.buildId).gray}] ` +
+        ((endTime - startTime) / 1000).toFixed(2) + 's ' +
+        'Build finish'.green
+      )
+
+      const {
+        warnings = [],
+        errors = []
+      } = stats.compilation
+      if (warnings.length) {
+        this.logError(warnings)
+      }
+
+      if (errors.length) {
+        this.logError(errors)
+      }
+    }
 
     this.logWarningTable(this.undefinedTagTable, '存在未在 json 文件中定义的组件')
     this.logWarningTable(this.definedNotUsedTable, '存在定义后未被使用的组件')
 
     analyzeGraph(stats, this.compilation)
-
-    if (warnings.length) {
-      this.logError(warnings)
-    }
-
-    if (errors.length) {
-      this.logError(errors)
-    }
 
     this.options.analyze && fs.writeFileSync(
       join(process.cwd(), 'analyze.json'),
