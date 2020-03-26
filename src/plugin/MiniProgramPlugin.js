@@ -204,18 +204,43 @@ module.exports = class MiniProgramPlugin {
   setEmitHook (chunks, callback) {
     const { compilation } = this
     const { assets, fileTimestamps } = compilation
+    const cantBeRemoveJsonFiles = []
+    const cacheRemovedJsonFiles = {}
+    const getJsonFile = (file) => join(
+      dirname(file),
+      `${basename(file, '.wxml')}.json`
+    )
 
-    const changeFiles = Object.keys(assets).filter(file => {
+    const changeFiles = []
+    Object.keys(assets).forEach(file => {
       const fileMeta = this.fileTree.getFileByDist(file)
 
       const hasChange = this.hasChange(fileMeta, assets[file])
 
       if (!hasChange) {
-        delete assets[file]
+        // 删除的自定义组件 json 文件先暂存，在 wxml 改变后需要恢复
+        fileMeta.isJson &&
+        (fileMeta.isComponentFile || fileMeta.isPageFile) &&
+        (cacheRemovedJsonFiles[file] = assets[file])
+
+        cantBeRemoveJsonFiles.indexOf(file) === -1 && delete assets[file]
+        return
+      }
+
+      // wxml 文件改变有可能会引起 json 文件中自定义组件的重新计算
+      if (fileMeta.isWxml && (fileMeta.isComponentFile || fileMeta.isPageFile)) {
+        const jsonFile = getJsonFile(file)
+        // 首先去要确认 json 文件没有在之前被删除，删除了需要恢复
+        if (cacheRemovedJsonFiles[jsonFile]) {
+          assets[jsonFile] = cacheRemovedJsonFiles[jsonFile]
+          changeFiles.push(jsonFile)
+        }
+
+        cantBeRemoveJsonFiles.push(jsonFile)
       }
 
       // 没有修改的文件直接不输出，减少计算
-      return hasChange
+      hasChange && changeFiles.push(file)
     })
 
     changeFiles.forEach(file => {
@@ -226,12 +251,10 @@ module.exports = class MiniProgramPlugin {
          */
       if (!isTemplate && isWxml) {
         const wxml = new Wxml(this, compilation, filePath, file)
+
         const usedComponents = wxml.usedComponents()
 
-        const jsonFile = join(
-          dirname(filePath),
-          `${basename(filePath, '.wxml')}.json`
-        )
+        const jsonFile = getJsonFile(filePath)
 
         if (fs.existsSync(jsonFile)) {
           this.fileTree.addFullComponent(jsonFile, usedComponents)
