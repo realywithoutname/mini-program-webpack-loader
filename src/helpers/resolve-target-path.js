@@ -46,7 +46,7 @@ module.exports.resolveTargetPath = function (file) {
   let TARGET = CONFIG[target]
   let ext = extname(file)
 
-  if (!ext) throw new Error('接受到一个不正常的文件')
+  if (!ext) throw new Error(`接受到一个不正常的文件${file}`)
 
   let method = 'T' + ext.substr(1, 1).toUpperCase() + ext.substr(2)
   return method && TARGET[method] ? TARGET[method](file) : file
