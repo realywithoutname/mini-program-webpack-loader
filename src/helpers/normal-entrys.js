@@ -29,8 +29,6 @@ exports.normalEntry = function normalEntry (context = process.cwd(), entry = [])
     Object.keys(entry).forEach((key) => {
       const _entry = Array.isArray(entry[key]) ? entry[key] : [entry[key]]
 
-      if (key === 'app') throw new Error('entry 的 key 存在为 app 的情况，会导致编译出错。')
-
       _entry.forEach(entry => {
         if (/\.json/.test(entry)) {
           miniEntrys.push(getEntry(entry))

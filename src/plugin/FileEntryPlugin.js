@@ -27,7 +27,7 @@ module.exports = class FileEntryPlugin extends Tapable {
     this._mode = options.mode
     this.options = options
     this.mainEntry = null
-    this.chunkNames = ['main']
+    this.chunkNames = ['main', 'miniapp-entry']
 
     this.hooks = {
       addPage: new SyncHook(['page', 'root']),

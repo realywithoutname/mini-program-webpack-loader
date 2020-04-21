@@ -66,6 +66,7 @@ module.exports = class MiniProgramPlugin {
     this.outputPath = compiler.options.output.path
 
     this.miniEntrys = normalEntry(compiler.context, compiler.options.entry)
+    compiler.options.entry = { main: this.miniEntrys }
 
     const entryDirs = this.miniEntrys.map(entry => dirname(entry))
 
