@@ -4,7 +4,7 @@ const { dirname, basename, join } = require('path')
 const { ProgressPlugin } = require('webpack')
 const { ConcatSource } = require('webpack-sources')
 
-const { relative } = require('../utils')
+const { relative, removeExt } = require('../utils')
 
 const Wxml = require('../classes/Wxml')
 const Loader = require('../classes/Loader')
@@ -46,6 +46,7 @@ module.exports = class MiniProgramPlugin {
   constructor (options) {
     this.undefinedTagTable = new Map()
     this.definedNotUsedTable = new Map()
+    this.unDeclareComponentTable = new Map()
     this.options = Object.assign(
       defaultOptions,
       options
@@ -125,6 +126,8 @@ module.exports = class MiniProgramPlugin {
   beforeCompile () {
     this.undefinedTagTable.clear()
     this.definedNotUsedTable.clear()
+    this.unDeclareComponentTable.clear()
+
     let appJson = this.FileEntryPlugin.getAppJson()
     let cachegroups = this.compiler.options.optimization.splitChunks.cacheGroups
 
@@ -405,6 +408,17 @@ module.exports = class MiniProgramPlugin {
     })
   }
 
+  /**
+   * 添加未申明 component: true 的组件
+   * @param {string} file 
+   */
+  pushUnDeclareComponentTag (file) {
+    if (this.fileTree.hasPage(removeExt(file))) {
+      return
+    }
+    this.unDeclareComponentTable.set(this.outputUtil.get(file), [file])
+  }
+
   messageOutPut (err, stats) {
     const log = (...rest) => (console.log(...rest) || true)
 
@@ -444,6 +458,7 @@ module.exports = class MiniProgramPlugin {
 
     this.logWarningTable(this.undefinedTagTable, '存在未在 json 文件中定义的组件')
     this.logWarningTable(this.definedNotUsedTable, '存在定义后未被使用的组件')
+    this.logWarningTable(this.unDeclareComponentTable, '存在未申明 component: true 的组件')
 
     analyzeGraph(stats, this.compilation)
 
