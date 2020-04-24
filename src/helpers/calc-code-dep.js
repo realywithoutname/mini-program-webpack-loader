@@ -43,8 +43,8 @@ module.exports.calcCodeDep = function calcCodeDep (miniLoader, dist, meta, codeS
     code = JSON.parse(code)
 
     const canUseComponents = miniLoader.fileTree.getCanUseComponents(meta.source, dist)
-    const { usingComponents = {}, componentGenerics = {} } = code
-
+    const { usingComponents = {}, componentGenerics = {}, component } = code
+    
     /**
      * 统计定义未使用的组件
      */
@@ -118,7 +118,7 @@ module.exports.calcCodeDep = function calcCodeDep (miniLoader, dist, meta, codeS
 
     miniLoader.pushUndefinedTag(meta.source, ignoredComponents)
     miniLoader.pushDefinedNotUsedTag(meta.source, definedAndNotUsed)
-
+    !component && miniLoader.pushUnDeclareComponentTag(meta.source)
     /**
      * 有些自定义组件一开始没有定义 componentGenerics，usingComponents
      */
