@@ -1,5 +1,6 @@
 const fs = require('fs')
 const readline = require('readline')
+const { Tapable, SyncHook } = require('tapable')
 const { dirname, basename, join } = require('path')
 const { ProgressPlugin } = require('webpack')
 const { ConcatSource } = require('webpack-sources')
@@ -42,8 +43,9 @@ const defaultOptions = {
 
 const stdout = process.stdout
 
-module.exports = class MiniProgramPlugin {
+module.exports = class MiniProgramPlugin extends Tapable {
   constructor (options) {
+    super()
     this.undefinedTagTable = new Map()
     this.definedNotUsedTable = new Map()
     this.unDeclareComponentTable = new Map()
@@ -57,6 +59,10 @@ module.exports = class MiniProgramPlugin {
     this.fileTree = new FileTree(this)
 
     this.startTime = Date.now()
+
+    this.hooks = {
+      apply: new SyncHook(['self'])
+    }
 
     Loader.$applyPluginInstance(this)
   }
@@ -410,7 +416,7 @@ module.exports = class MiniProgramPlugin {
 
   /**
    * 添加未申明 component: true 的组件
-   * @param {string} file 
+   * @param {string} file
    */
   pushUnDeclareComponentTag (file) {
     if (this.fileTree.hasPage(removeExt(file))) {

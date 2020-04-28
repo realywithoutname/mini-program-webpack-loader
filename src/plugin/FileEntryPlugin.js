@@ -1,5 +1,5 @@
 const { existsSync, readFileSync } = require('fs')
-const { Tapable, SyncHook } = require('tapable')
+const { Tapable, SyncHook, SyncWaterfallHook } = require('tapable')
 const { ConcatSource } = require('webpack-sources')
 const { dirname, join, extname, basename } = require('path')
 const MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin')
@@ -31,7 +31,8 @@ module.exports = class FileEntryPlugin extends Tapable {
 
     this.hooks = {
       addPage: new SyncHook(['page', 'root']),
-      addFiles: new SyncHook(['files'])
+      addFiles: new SyncHook(['files']),
+      getAppJsonCode: new SyncWaterfallHook(['code'])
     }
   }
 
@@ -141,9 +142,21 @@ module.exports = class FileEntryPlugin extends Tapable {
 
   setEmitHook (compilation, callback) {
     let assets = compilation.assets
+
     assets['app.js'] = this.getAppJsCode(assets)
+    if (!assets['app.js']) {
+      delete assets['app.js']
+      assets['app.js'] = new ConcatSource('App({});')
+      this.compilation.warnings.push('没有对应的 app.js 文件')
+    }
+
     assets['app.wxss'] = this.getAppWxss(assets)
-    assets['app.json'] = this.getAppJsonCode(assets)
+    if (!assets['app.wxss']) {
+      delete assets['app.wxss']
+      this.compilation.warnings.push('没有对应的 app.wxss 文件')
+    }
+
+    assets['app.json'] = this.getAppJsonCode()
 
     if (this.options.extfile) {
       assets['ext.json'] = this.getExtJson(assets)
@@ -222,7 +235,9 @@ module.exports = class FileEntryPlugin extends Tapable {
   }
 
   getAppJsonCode () {
-    return new ConcatSource(JSON.stringify(this.getAppJson()))
+    const code = this.hooks.getAppJsonCode.call(this.getAppJson())
+
+    return new ConcatSource(JSON.stringify(code))
   }
 
   getExtJson (assets) {
