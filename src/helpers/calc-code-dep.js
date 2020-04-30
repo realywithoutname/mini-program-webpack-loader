@@ -12,9 +12,13 @@ const { isNativeTag } = require(`../platform/${target}/wxml`)
 module.exports.calcCodeDep = function calcCodeDep (miniLoader, dist, meta, codeSource, checkAndCalcDep) {
   const source = new ConcatSource()
 
-  let code = codeSource.source().toString()
-
   let { isWxml, isWxss, isWxs, isJson, isJs, components, usedComponents = [], deps } = meta
+
+  if (!(isWxml || isWxss || isWxs || isJson || isJs)) {
+    return codeSource
+  }
+
+  let code = codeSource.source().toString()
 
   /**
    * 更新 js 中的 require
@@ -44,7 +48,7 @@ module.exports.calcCodeDep = function calcCodeDep (miniLoader, dist, meta, codeS
 
     const canUseComponents = miniLoader.fileTree.getCanUseComponents(meta.source, dist)
     const { usingComponents = {}, componentGenerics = {}, component } = code
-    
+
     /**
      * 统计定义未使用的组件
      */
