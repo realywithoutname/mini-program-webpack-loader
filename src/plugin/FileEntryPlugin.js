@@ -59,7 +59,7 @@ module.exports = class FileEntryPlugin extends Tapable {
     this.compilation = compilation
     compilation.hooks.optimizeTree.tapAsync('FileEntryPlugin', (chunks, modules, cb) => this.optimizeTree(chunks, modules, cb))
     // 检查是否需要重新编译
-    compilation.hooks.needAdditionalPass.tap('FileEntryPlugin', () => this.needAdditionalPass)
+    compilation.hooks.needAdditionalPass.tap('FileEntryPlugin', () => this.needAdditionalPass ? true : undefined)
   }
 
   /**
