@@ -309,6 +309,11 @@ module.exports = class MiniProgramPlugin extends Tapable {
          * 文件在分包
          */
       if (subRoot) {
+        // 文件在分包，而被其他分包引用，则报错
+        if (usedPkgs && usedPkgs.length && usedPkgs.some(p => p !== subRoot)) {
+          throw new Error(`文件 ${dist} 在所属分包外引用，决不允许: [${usedPkgs.join(', ')}]`)
+        }
+
         // 只需要计算依赖的文件的路径，输出路径不会被改变
         outDist.push({
           root: subRoot,

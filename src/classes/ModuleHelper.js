@@ -121,9 +121,9 @@ module.exports = class ModuleHelper {
       while (stack.length && !usedInMainPackage) {
         const meta = stack.pop()
         const { source, used } = meta
-        const matched = source.match(reg)
+        const matched = this.fileIsInSubPackage(source) // source.match(reg)
         if (matched) {
-          roots.push(matched[0].substr(1))
+          roots.push(matched)
           usedInSubPackages = true
           continue
         }
@@ -168,7 +168,17 @@ module.exports = class ModuleHelper {
       Object.keys(packages).filter(root => !!root).map(root => `/${root}/`).join('|')
     )
 
-    let matched = file.match(reg)
-    return matched ? matched[0].substr(1) : false
+    const matched = file.match(reg)
+
+    if (matched) {
+      const packName = matched[0].substring(1, matched[0].length - 1)
+      const matchedPack = packages[packName]
+  
+      // 检查文件确实属于分包
+      if (matchedPack && file.indexOf(matchedPack.context) === 0 && file.substr(matchedPack.context.length + 1).indexOf(packName) === 0) {
+        return matched[0].substr(1)
+      }
+    }
+    return false
   }
 }
