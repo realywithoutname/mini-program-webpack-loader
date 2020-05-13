@@ -70,7 +70,8 @@ const NATIVE_TAGS = new Set([
   'include',
   'block',
   'slot',
-  'movable-area'
+  'movable-area',
+  'page-meta'
 ])
 
 module.exports.isNativeTag = function isNativeTag (tag) {
