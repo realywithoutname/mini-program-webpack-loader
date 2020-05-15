@@ -1,6 +1,6 @@
 {
   "name": "mini-program-webpack-loader",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "mini-program webpack loader",
   "main": "src/index.js",
   "scripts": {
@@ -11,7 +11,7 @@
     "webpack",
     "mini-program"
   ],
-  "author": "youzan",
+  "author": "liujiandong",
   "license": "ISC",
   "devDependencies": {
     "eslint": "^5.6.1",
