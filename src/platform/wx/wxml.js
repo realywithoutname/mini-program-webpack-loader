@@ -71,7 +71,8 @@ const NATIVE_TAGS = new Set([
   'block',
   'slot',
   'movable-area',
-  'page-meta'
+  'page-meta',
+  'editor'
 ])
 
 module.exports.isNativeTag = function isNativeTag (tag) {
