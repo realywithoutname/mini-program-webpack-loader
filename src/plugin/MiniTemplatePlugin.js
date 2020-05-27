@@ -1,4 +1,4 @@
-const { join } = require('path')
+const { join } = require('../lib/path')
 const { ConcatSource, RawSource } = require('webpack-sources')
 const requireCode = require('../lib/require')
 const utils = require('../utils')

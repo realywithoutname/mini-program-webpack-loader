@@ -4,7 +4,7 @@ const {
   extname,
   relative,
   basename
-} = require('path')
+} = require('./lib/path')
 
 exports.camelCase = (str) => {
   let words = str.split(/[^a-zA-Z]/)

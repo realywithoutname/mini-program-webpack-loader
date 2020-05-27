@@ -1,5 +1,5 @@
 // const fs = require('fs')
-const path = require('path')
+const path = require('../lib/path')
 const { LOADER_ACCEPT_FILE_EXTS } = require('../config/constant')
 const minisizeWxml = require('../helpers/html-mini-loader')
 const isInvaildExt = ext => LOADER_ACCEPT_FILE_EXTS.indexOf(ext) === -1
