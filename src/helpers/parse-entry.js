@@ -1,4 +1,4 @@
-const { join } = require('path')
+const { join } = require('../lib/path')
 
 function validateProptery (val, property) {
   if (val !== true && !Array.isArray(val)) {
