@@ -1,4 +1,4 @@
-const { dirname } = require('../lib/path')
+const { dirname } = require('path')
 const { readFileSync } = require('fs')
 
 async function resolveComponent (resolver, context, component) {

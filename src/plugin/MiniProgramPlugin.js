@@ -1,7 +1,7 @@
 const fs = require('fs')
 const readline = require('readline')
 const { Tapable, SyncHook } = require('tapable')
-const { dirname, basename, join } = require('../lib/path')
+const { dirname, basename, join } = require('path')
 const { ProgressPlugin } = require('webpack')
 const { ConcatSource } = require('webpack-sources')
 

@@ -1,4 +1,4 @@
-const { extname } = require('../lib/path')
+const { extname } = require('path')
 const CONFIG = {
   ali: {
     TWxs (path) {

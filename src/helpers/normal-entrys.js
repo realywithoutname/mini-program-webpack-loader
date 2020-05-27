@@ -1,4 +1,4 @@
-const { join, isAbsolute } = require('../lib/path')
+const { join, isAbsolute } = require('path')
 const { existsSync } = require('fs')
 
 /**
