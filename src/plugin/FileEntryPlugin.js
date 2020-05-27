@@ -16,6 +16,12 @@ const { ENTRY_ACCEPT_FILE_EXTS } = require('../config/constant')
 const mainChunkNameTemplate = '__assets_chunk_name__'
 let mainChunkNameIndex = 0
 
+const IS_WIN32 = process.platform === 'win32';
+
+function replacePathSep(ppath) {
+  return IS_WIN32 ? ppath.replace(/\\/g, '/') : ppath;
+}
+
 module.exports = class FileEntryPlugin extends Tapable {
   constructor (miniLoader, options) {
     super()
@@ -213,12 +219,12 @@ module.exports = class FileEntryPlugin extends Tapable {
         const element = this.packages[root]
 
         if (!element.root) {
-          appCode.pages = (element.pages || []).map((page) => this.miniLoader.outputUtil.get(page))
+          appCode.pages = (element.pages || []).map((page) => replacePathSep(this.miniLoader.outputUtil.get(page)))
         } else {
           const { pages: subPages, root } = element
 
           const distPages = subPages.map((page) => {
-            const dist = this.miniLoader.outputUtil.get(page)
+            const dist = replacePathSep(this.miniLoader.outputUtil.get(page))
 
             return dist.replace(`${root}/`, '')
           })
