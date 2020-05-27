@@ -120,9 +120,11 @@ module.exports.calcCodeDep = function calcCodeDep (miniLoader, dist, meta, codeS
       componentGenerics[componentName] && delete componentGenerics[componentName]
     })
 
-    miniLoader.pushUndefinedTag(meta.source, ignoredComponents)
-    miniLoader.pushDefinedNotUsedTag(meta.source, definedAndNotUsed)
-    !component && miniLoader.pushUnDeclareComponentTag(meta.source)
+    if (process.env.NODE_ENV !== 'production') {
+      miniLoader.pushUndefinedTag(meta.source, ignoredComponents)
+      miniLoader.pushDefinedNotUsedTag(meta.source, definedAndNotUsed)
+      !component && miniLoader.pushUnDeclareComponentTag(meta.source)
+    }
     /**
      * 有些自定义组件一开始没有定义 componentGenerics，usingComponents
      */
