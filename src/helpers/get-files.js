@@ -4,7 +4,7 @@
  * @param {*} path
  * @param {*} exts
  */
-const { join } = require('../lib/path')
+const { join } = require('path')
 const { existsSync } = require('fs')
 const EXTS = ['.js', '.ts', '.json', '.wxml', '.wxss', '.wxs', '.scss', '.pcss', '.less']
 

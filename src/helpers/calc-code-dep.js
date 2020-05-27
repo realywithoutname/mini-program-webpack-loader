@@ -1,6 +1,6 @@
 const target = process.env.TARGET || 'wx'
 const { ConcatSource } = require('webpack-sources')
-const { basename, dirname, join } = require('../lib/path')
+const { basename, dirname, join } = require('path')
 const { relative } = require('../utils')
 const { updateJsCode } = require('./update-code')
 const { resolveTargetPath } = require('./resolve-target-path')

@@ -1,7 +1,7 @@
 const { existsSync, readFileSync } = require('fs')
 const { Tapable, SyncHook, SyncWaterfallHook } = require('tapable')
 const { ConcatSource } = require('webpack-sources')
-const { dirname, join, extname, basename } = require('../lib/path')
+const { dirname, join, extname, basename } = require('path')
 const MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin')
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin')
 

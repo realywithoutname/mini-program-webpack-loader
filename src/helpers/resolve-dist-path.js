@@ -1,4 +1,4 @@
-const { join, dirname } = require('../lib/path')
+const { join, dirname } = require('path')
 const { relative } = require('../utils')
 /**
  * 资源目录排序，在计算路径时优先根据子路径计算

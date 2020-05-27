@@ -1,5 +1,5 @@
 const { orderSource } = require('../helpers/resolve-dist-path')
-const { join, relative, isAbsolute } = require('../lib/path')
+const { join, relative, isAbsolute } = require('path')
 
 module.exports = class OutPutPath {
   constructor (context, resources, outPath) {

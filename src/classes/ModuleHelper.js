@@ -1,4 +1,4 @@
-const { dirname, basename, extname, join } = require('../lib/path')
+const { dirname, basename, extname, join } = require('path')
 
 module.exports = class ModuleHelper {
   constructor (miniLoader) {
