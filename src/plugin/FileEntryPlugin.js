@@ -395,6 +395,7 @@ module.exports = class FileEntryPlugin extends Tapable {
         pages,
         name,
         root,
+        context,
         entry,
         independent,
         plugins
