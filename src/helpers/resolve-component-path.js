@@ -49,7 +49,7 @@ async function resolveComponentsPath (resolver, request) {
    * 自定义组件
    */
   let normalPromises = forEachUsingComponent(usingComponents, async (key, item) => {
-    if (/^plugin:\/\//.test(item)) {
+    if (/^plugin:\/\//.test(item) || /^plugin-private:\/\//.test(item)) {
       components.set(key, {
         request,
         origin: item,
