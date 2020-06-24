@@ -1,3 +1,4 @@
+const target = process.env.TARGET || 'wx'
 const { existsSync, readFileSync } = require('fs')
 const { Tapable, SyncHook, SyncWaterfallHook } = require('tapable')
 const { ConcatSource } = require('webpack-sources')
@@ -12,14 +13,15 @@ const { getAcceptPackages } = require('../helpers/parse-entry')
 const { createResolver } = require('../helpers/create-resolver')
 const { resolveComponentsFiles } = require('../helpers/resolve-component-path')
 const { ENTRY_ACCEPT_FILE_EXTS } = require('../config/constant')
+const { getEmptyFileSource } = require(`../platform/${target}/get-empty-file-source`)
 
 const mainChunkNameTemplate = '__assets_chunk_name__'
 let mainChunkNameIndex = 0
 
-const IS_WIN32 = process.platform === 'win32';
+const IS_WIN32 = process.platform === 'win32'
 
-function replacePathSep(ppath) {
-  return IS_WIN32 ? ppath.replace(/\\/g, '/') : ppath;
+function replacePathSep (ppath) {
+  return IS_WIN32 ? ppath.replace(/\\/g, '/') : ppath
 }
 
 module.exports = class FileEntryPlugin extends Tapable {
@@ -166,6 +168,17 @@ module.exports = class FileEntryPlugin extends Tapable {
 
     if (this.options.extfile) {
       assets['ext.json'] = this.getExtJson(assets)
+    }
+
+    const { emptyComponent } = this.options
+    if (emptyComponent) {
+      Object.keys(assets).forEach(file => {
+        if (emptyComponent.test(file)) {
+          const fileMeta = this.miniLoader.fileTree.getFileByDist(file)
+
+          assets[file] = getEmptyFileSource(fileMeta)
+        }
+      })
     }
 
     this.removeIgnoreAssets(assets)
@@ -433,7 +446,7 @@ module.exports = class FileEntryPlugin extends Tapable {
     /**
      * 第一次加载时，一次性把所以文件都添加到编译，减少编译时间
      */
-    return resolveComponentsFiles(jsons, componentSet, this.resolver)
+    return resolveComponentsFiles(jsons, componentSet, this.resolver, this.options.emptyComponent)
       .then(() => {
         const jsons = Array.from(componentSet)
         jsons.forEach(({ tag, component }) => {

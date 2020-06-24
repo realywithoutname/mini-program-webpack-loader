@@ -112,9 +112,13 @@ async function resolveComponentsPath (resolver, request) {
   return components
 }
 
-module.exports.resolveComponentsFiles = async function (jsons, componentSet, resolver) {
+module.exports.resolveComponentsFiles = async function (jsons, componentSet, resolver, emptyComponent) {
   let nextJsons = []
   for (const json of jsons) {
+    if (emptyComponent && emptyComponent.test(json)) {
+      return // 对于需要处理为空组件的不再加载其子组件
+    }
+
     let components = await resolveComponentsPath(resolver, json)
 
     for (const [key, component] of components) {
@@ -125,5 +129,5 @@ module.exports.resolveComponentsFiles = async function (jsons, componentSet, res
     }
   }
 
-  nextJsons.length && await module.exports.resolveComponentsFiles(nextJsons, componentSet, resolver)
+  nextJsons.length && await module.exports.resolveComponentsFiles(nextJsons, componentSet, resolver, emptyComponent)
 }
