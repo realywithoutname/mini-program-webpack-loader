@@ -116,7 +116,7 @@ module.exports.resolveComponentsFiles = async function (jsons, componentSet, res
   let nextJsons = []
   for (const json of jsons) {
     if (emptyComponent && emptyComponent.test(json)) {
-      return // 对于需要处理为空组件的不再加载其子组件
+      continue // 对于需要处理为空组件的不再加载其子组件
     }
 
     let components = await resolveComponentsPath(resolver, json)
