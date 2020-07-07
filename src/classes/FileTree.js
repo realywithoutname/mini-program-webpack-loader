@@ -1,6 +1,7 @@
 const { basename, dirname, join } = require('path')
 const { resolveTargetPath } = require('../helpers/resolve-target-path')
 const { relative } = require('../utils')
+const { getFile } = require('../helpers/get-files')
 
 /**
 FileNode: {
@@ -64,7 +65,7 @@ function getFileMeta (file, outputUtil) {
   }
 
   for (const key in regRules) {
-    if (new RegExp(`${key}`).test(file)) {
+    if (new RegExp(`${key}`).test(getFile(file))) {
       regRules[key].call(null, meta)
       break
     }
@@ -80,6 +81,7 @@ class FileTree {
     this.tree.set('pages', new Map())
     this.tree.set('files', new Map())
     this.tree.set('components', new Map())
+    this.tree.set('relations', new Map())
     this.tree.set('globalComponents', new Map())
 
     this.outputMap = {}
@@ -136,6 +138,10 @@ class FileTree {
 
   get comSize () {
     return this.components.size
+  }
+
+  get relations () {
+    return this.tree.get('relations')
   }
 
   /**
@@ -296,13 +302,20 @@ class FileTree {
     })
   }
 
+  addCompiler (file) {
+    const fileMeta = this.getFile(file)
+
+    fileMeta.inCompiler = true
+  }
+
   /**
    * @param {*} file
    * @param {*} depFiles
    */
   addDeps (file, deps) {
-    let fileMap = this.files
-    let fileMeta = fileMap.get(file)
+    const fileMap = this.files
+    const fileMeta = fileMap.get(file)
+    // const addedDeps = fileMeta.deps
     const depMetas = new Set()
 
     for (const item of deps) {
@@ -318,7 +331,22 @@ class FileTree {
       depMetas.add(...meta)
     }
 
+    if (!fileMeta) {
+      debugger
+    }
     fileMeta.deps = depMetas
+  }
+
+  addRelation (file, unikey, data) {
+    if (!unikey) return
+
+    const hasRelationFile = this.relations.has(file)
+    const fileMeta = hasRelationFile ? this.getFile(file) : [...this.setFile(file)].pop()
+
+    !hasRelationFile && this.relations.set(file, fileMeta)
+
+    fileMeta.data = fileMeta.data || new Map()
+    fileMeta.data.set(unikey, data)
   }
 
   has (file) {
@@ -370,6 +398,7 @@ class FileTree {
 
       fileSet.add(meta)
       fileMap.set(file, meta)
+      // console.log('Set file: ', file)
     }
 
     return fileSet
@@ -381,6 +410,7 @@ class FileTree {
 
     if (!fileMeta) {
       if (!safe) {
+        // console.log(file, fileMap.keys())
         throw new Error('Can`t find file: ' + file)
       }
 

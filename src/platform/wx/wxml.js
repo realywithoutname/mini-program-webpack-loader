@@ -18,6 +18,10 @@ module.exports.loadWxmlContent = function loadContent (compilation, getFileHelpe
     buff.add(depContent)
   }
 
+  if (content === undefined) {
+    debugger
+  }
+
   buff.add(content)
 
   return buff

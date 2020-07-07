@@ -112,22 +112,70 @@ async function resolveComponentsPath (resolver, request) {
   return components
 }
 
-module.exports.resolveComponentsFiles = async function (jsons, componentSet, resolver, emptyComponent) {
+function findComponent (parentPath, componentSet) {
+  // 取最后加入到集合的组件
+  for (const component of [...componentSet.values()].reverse()) {
+    if (component.component.absPath === parentPath) {
+      return component
+    }
+  }
+}
+
+module.exports.resolveComponentsFiles = async function (jsons, componentSet, resolver, emptyComponent, canBeTemplateTest, newComponentSet) {
   let nextJsons = []
   for (const json of jsons) {
     if (emptyComponent && emptyComponent.test(json)) {
       continue // 对于需要处理为空组件的不再加载其子组件
     }
 
+    newComponentSet = newComponentSet || componentSet
+    const parentComponent = findComponent(json, newComponentSet)
+
     let components = await resolveComponentsPath(resolver, json)
 
+    // 该自定义组件是否能进行自定义组件合并
+    const canBeTemplate = canBeTemplateTest({ ...parentComponent.component, tag: parentComponent.tag })
+
+    // 确定该组件是不是可以作为主组件，如果父组件有 mainComponentPath 则，该组件只能是模版或者不能合并的自定义组件
+    let mainComponentPath = parentComponent.parent && parentComponent.parent.mainComponentPath
+
+    // 只有能够作为模版的组件才设置标示
+    if (canBeTemplate) {
+      if (parentComponent.component.type === 'normal' || parentComponent.component.type === 'page') {
+        // 如果能够进行合并，如果该自定义组件可以被合并，并且不是合并到其他自定义组件，则该自定义组件可以合并其他自定义组件
+        parentComponent.useTemplate = !mainComponentPath
+
+        // 需要转换为模版
+        parentComponent.beTemplate = !!mainComponentPath
+      }
+      // 作为自定义组件，则修改 mainComponentPath
+      if (parentComponent.useTemplate) {
+        mainComponentPath = parentComponent.mainComponentPath = json
+      }
+    } else {
+      // 不能作为模版的组件
+      delete parentComponent.mainComponentPath
+      // 子组件都依赖该组件
+      mainComponentPath = json
+    }
+
     for (const [key, component] of components) {
-      componentSet.add({ tag: key, component })
+      const childComponent = {
+        tag: key,
+        component: component,
+        mainComponentPath,
+        children: new Set(),
+        parent: parentComponent // 这个在关系上不一定是真正使用他的父组件，但是数据是一致的
+      }
+
+      componentSet.add(childComponent)
+      parentComponent.children.add(childComponent)
+
       if (component.type === 'normal' || (component.type === 'generics' && component.absPath)) {
         nextJsons.push(component.absPath)
       }
     }
   }
 
-  nextJsons.length && await module.exports.resolveComponentsFiles(nextJsons, componentSet, resolver, emptyComponent)
+  nextJsons.length && await module.exports.resolveComponentsFiles(nextJsons, componentSet, resolver, emptyComponent, canBeTemplateTest)
 }

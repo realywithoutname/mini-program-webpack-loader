@@ -43,7 +43,7 @@ module.exports.calcCodeDep = function calcCodeDep (miniLoader, dist, meta, codeS
   /**
    * json 文件处理，主要处理自定义组件的 json 文件
    */
-  if (isJson && components.size) {
+  if (isJson) {
     code = JSON.parse(code)
 
     const canUseComponents = miniLoader.fileTree.getCanUseComponents(meta.source, dist)
@@ -91,6 +91,9 @@ module.exports.calcCodeDep = function calcCodeDep (miniLoader, dist, meta, codeS
        */
       let distPath = checkAndCalcDep && checkAndCalcDep(component.originPath)
 
+      if (meta.source.indexOf('packages/home/dashboard/index')) {
+        debugger
+      }
       // 自定义计算方法只是给了相对路径，需要去掉 .json
       distPath = !distPath ? component.distPath : (
         './' + join(

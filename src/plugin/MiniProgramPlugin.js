@@ -8,7 +8,6 @@ const { ConcatSource } = require('webpack-sources')
 const { relative, removeExt } = require('../utils')
 
 const Wxml = require('../classes/Wxml')
-const Loader = require('../classes/Loader')
 const FileTree = require('../classes/FileTree')
 const OutPutPath = require('../classes/OutPutPath')
 const ModuleHelper = require('../classes/ModuleHelper')
@@ -63,8 +62,6 @@ module.exports = class MiniProgramPlugin extends Tapable {
     this.hooks = {
       apply: new SyncHook(['self'])
     }
-
-    Loader.$applyPluginInstance(this)
   }
 
   apply (compiler) {
@@ -151,6 +148,10 @@ module.exports = class MiniProgramPlugin extends Tapable {
     compilation.mainTemplate.hooks.assetPath.tap('MiniProgramPlugin', path => this.outputUtil.get(path))
     // 添加额外文件
     compilation.hooks.additionalAssets.tapAsync('MiniProgramPlugin', callback => this.additionalAssets(compilation, callback))
+    compilation.hooks.normalModuleLoader.tap('MiniProgramPlugin', (loaderContext, module) => {
+      loaderContext.fileTree = this.fileTree
+      loaderContext['mini-loader'] = true
+    })
   }
 
   /**
@@ -432,7 +433,7 @@ module.exports = class MiniProgramPlugin extends Tapable {
 
   messageOutPut (err, stats) {
     const log = (...rest) => (console.log(...rest) || true)
-
+    console.log('build finish')
     try {
       this.options.compilationFinish &&
       this.options.compilationFinish(err, stats, this.FileEntryPlugin.getAppJson(), this)
@@ -467,10 +468,9 @@ module.exports = class MiniProgramPlugin extends Tapable {
       }
     }
 
-    this.logWarningTable(this.undefinedTagTable, '存在未在 json 文件中定义的组件')
-    this.logWarningTable(this.definedNotUsedTable, '存在定义后未被使用的组件')
-    this.logWarningTable(this.unDeclareComponentTable, '存在未申明 component: true 的组件')
-
+    // this.logWarningTable(this.undefinedTagTable, '存在未在 json 文件中定义的组件')
+    // this.logWarningTable(this.definedNotUsedTable, '存在定义后未被使用的组件')
+    // this.logWarningTable(this.unDeclareComponentTable, '存在未申明 component: true 的组件')
     analyzeGraph(stats, this.compilation)
 
     this.options.analyze && fs.writeFileSync(

@@ -8,3 +8,7 @@ module.exports.find = function find (content, test) {
   DomUtils.find(test, dom, true)
   return dom
 }
+
+module.exports.getXml = function getXml (dom) {
+  return DomUtils.getInnerHTML({ children: dom }, { xmlMode: true })
+}

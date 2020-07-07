@@ -2,6 +2,7 @@ const { join } = require('path')
 const { ConcatSource, RawSource } = require('webpack-sources')
 const requireCode = require('../lib/require')
 const utils = require('../utils')
+const { getFile } = require('../helpers/get-files')
 
 module.exports = class MiniTemplate {
   constructor (miniLoader) {
@@ -34,12 +35,13 @@ module.exports = class MiniTemplate {
       if (!chunk.entryModule || !chunk.entryModule.resource) {
         return source
       }
+      const resource = getFile(chunk.entryModule.resource)
 
       const globalRequire = 'require'
 
-      let webpackRequire = `${globalRequire}("${this.getRequirePath(chunk.entryModule.resource)}")`
+      let webpackRequire = `${globalRequire}("${this.getRequirePath(resource)}")`
       // 支持独立分包，先这样处理，render hook 添加的不对
-      if (chunk.entryModule.resource && this.miniLoader.fileTree.getFile(chunk.entryModule.resource).independent) {
+      if (resource && this.miniLoader.fileTree.getFile(resource).independent) {
         webpackRequire = requireCode.toString() + ';\nvar installedModules = {}'
       }
 

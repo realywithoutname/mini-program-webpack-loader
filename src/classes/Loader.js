@@ -1,5 +1,8 @@
 // const fs = require('fs')
 const path = require('path')
+const { parseQuery } = require('loader-utils')
+const { relative } = require('../utils')
+const { find, getXml } = require('../helpers/wxml-parser')
 const { LOADER_ACCEPT_FILE_EXTS } = require('../config/constant')
 const minisizeWxml = require('../helpers/html-mini-loader')
 const isInvaildExt = ext => LOADER_ACCEPT_FILE_EXTS.indexOf(ext) === -1
@@ -10,10 +13,9 @@ class MiniLoader {
     this.source = code
     this.callback = loader.async()
     this.context = loader.context
+    if (!loader['mini-loader']) throw new Error('该 loader 必须和插件配合使用')
 
-    if (!this.miniLoader) throw new Error('该 loader 必须和插件配合使用')
-
-    this.fileTree = this.miniLoader.fileTree
+    this.fileTree = loader.fileTree
     // 获取文件信息
     this.fileMeta = this.fileTree.getFile(loader.resourcePath)
 
@@ -21,16 +23,18 @@ class MiniLoader {
       loader.resolve(context, request, (err, result) => err ? reject(err) : resolve(result))
     })
 
-    // wxml 压缩
-    if (this.fileMeta.isWxml) {
-      this.source = minisizeWxml(code, this.fileMeta)
-    }
-
     /**
      * 返回最终这个文件的内容
      */
     this.normalParser().then(
-      code => this.callback(null, code),
+      code => {
+        // wxml 压缩
+        if (this.fileMeta.isWxml) {
+          code = minisizeWxml(code, this.fileMeta)
+        }
+
+        this.callback(null, code)
+      },
       this.callback
     )
   }
@@ -38,7 +42,7 @@ class MiniLoader {
   async normalParser (reg) {
     return this.loadNormalFileDeps(reg).then(map => {
       let deps = []
-      let code = this.source
+      let { code, queryDeps } = this.mergeTemplate(this.source)
       let promises = []
 
       for (const value of map.values()) {
@@ -53,6 +57,8 @@ class MiniLoader {
         deps.push(value)
       }
 
+      deps.push(...queryDeps)
+
       /**
        * 依赖的文件添加到文件树中
        */
@@ -62,6 +68,80 @@ class MiniLoader {
     })
   }
 
+  mergeTemplate (code) {
+    let queryDeps = []
+    if (!this.loader.resourceQuery) {
+      return { code, queryDeps }
+    }
+    const query = parseQuery(this.loader.resourceQuery)
+    let { deps, isEntry, namespace } = query
+    if (!deps) return { code, queryDeps }
+
+    deps = JSON.parse(deps)
+
+    const sources = []
+    const tags = []
+    const names = {}
+
+    deps.forEach((item) => {
+      const dep = relative(this.fileMeta.source, item.path)
+
+      queryDeps.push({
+        origin: dep,
+        sourcePath: item.path
+      })
+
+      if (this.fileMeta.isWxml) {
+        tags.push(item.tag)
+        names[item.tag] = item.name
+
+        sources.push(`<import src="${dep}"/>`)
+      }
+
+      if (this.fileMeta.isWxss) {
+        sources.push(`@import "${dep}";`)
+      }
+    })
+
+    if (this.fileMeta.isWxml) {
+      const dom = find(code, (node) => {
+        if (node.type === 'tag') {
+          const tagIndex = tags.indexOf(node.name)
+
+          if (tagIndex !== -1) {
+            this.fileTree.addRelation(
+              query.depTree,
+              `${names[node.name]}$$${query.namespace}`,
+              {
+                namespace: names[node.name],
+                parentNamespace: query.namespace,
+                node: JSON.stringify(node.attribs)
+              }
+            )
+            node.attribs.is = names[node.name]
+            node.attribs.data = `{{ ...${names[node.name]} }}`
+            node.name = 'template'
+          }
+        }
+      })
+
+      code = getXml(dom)
+
+      if (!isEntry) {
+        sources.push(`
+    <template name="${namespace}">
+    ${code}
+    </template>
+        `)
+      }
+    }
+
+    if (isEntry) {
+      sources.push(code)
+    }
+
+    return { code: sources.join('\n'), queryDeps }
+  }
   addDepsModule (request) {
     return new Promise((resolve, reject) => {
       this.loader.loadModule(request, (err, src) => {
@@ -136,7 +216,3 @@ class MiniLoader {
 }
 
 module.exports = MiniLoader
-
-module.exports.$applyPluginInstance = function (plugin) {
-  MiniLoader.prototype.miniLoader = plugin
-}
