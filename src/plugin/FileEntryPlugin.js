@@ -225,6 +225,12 @@ module.exports = class FileEntryPlugin extends Tapable {
     delete appCode.pages
     delete appCode.subPackages
     delete appCode.usingComponents
+
+    if (Object.keys(this._entrysConfig).length) {
+      delete appCode.preloadRule
+      delete appCode.tabBar
+    }
+
     appCode.subPackages = []
 
     for (const root in this.packages) {
@@ -248,6 +254,14 @@ module.exports = class FileEntryPlugin extends Tapable {
           })
         }
       }
+    }
+
+    if (appCode.pages.length === 0 && appCode.subPackages.length !== 0) {
+      let mainPkg = appCode.subPackages.pop()
+
+      appCode.pages = mainPkg.pages.map(page => {
+        return `${mainPkg.root}/${page}`
+      })
     }
 
     return appCode
@@ -393,7 +407,7 @@ module.exports = class FileEntryPlugin extends Tapable {
 
       pages = pages.map(page => join(context, root, page))
       if (!isEmpty(pkg)) {
-        console.assert(Boolean(pkg.independent) === Boolean(independent), `独立分包不支持于非独立分包合并: ${root}`)
+        console.assert(Boolean(pkg.independent) === Boolean(independent), `独立分包不支持与非独立分包合并: ${root}`)
 
         pkgs[root].pages = [
           ...new Set([

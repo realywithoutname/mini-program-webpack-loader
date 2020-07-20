@@ -92,14 +92,10 @@ module.exports = class ModuleHelper {
   onlyUsedInSubPackagesReturnRoots (file) {
     const { packages } = this.fileEntryPlugin
     // 如果只有一个且是主包，直接跳过
-    const firstPackage = packages[0] || {};
+    const firstPackage = packages[0] || {}
     if (Object.keys(packages).length === 1 && !firstPackage.root) {
-      return [];
+      return []
     }
-
-    const reg = new RegExp(
-      Object.keys(packages).filter(root => !!root).map(root => `/${root}/`).join('|')
-    )
 
     const fileMeta = this.fileTree.getFile(file)
     const { used } = fileMeta
@@ -173,7 +169,7 @@ module.exports = class ModuleHelper {
     if (matched) {
       const packName = matched[0].substring(1, matched[0].length - 1)
       const matchedPack = packages[packName]
-  
+
       // 检查文件确实属于分包
       if (matchedPack && file.indexOf(matchedPack.context) === 0 && file.substr(matchedPack.context.length + 1).indexOf(packName) === 0) {
         return matched[0].substr(1)

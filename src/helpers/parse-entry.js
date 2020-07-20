@@ -9,6 +9,8 @@ function parsePackages (acceptPages = [], acceptPkg = [], ignorePages = [], conf
   validateProptery(acceptPages, 'entry.accept.pages')
   validateProptery(acceptPkg, 'entry.accept.subPackages')
 
+  const independentPkgs = (config.subPackages || []).filter(({ independent }) => independent)
+
   if (acceptPages === true) acceptPages = config.pages
 
   let roots = (config.subPackages || []).map(({ root }) => root)
@@ -39,7 +41,7 @@ function parsePackages (acceptPages = [], acceptPkg = [], ignorePages = [], conf
 
   config.pages = config.pages.filter(page => ignorePages.indexOf(page) === -1)
 
-  const allowSubPackages = []
+  const allowSubPackages = independentPkgs
 
   config.subPackages.forEach(({ root, pages }) => {
     let pkg = { root, pages: [] }
