@@ -147,7 +147,7 @@ module.exports = class MiniProgramPlugin extends Tapable {
     this.compilation = compilation
 
     // 统一输出路径
-    compilation.hooks.optimizeChunks.tap('MiniProgramPlugin', this.optimizeChunks.bind(this))
+    compilation.hooks.optimizeChunks.tap('MiniProgramPlugin', this.optimizeChunks.bind(this, compilation))
     compilation.mainTemplate.hooks.assetPath.tap('MiniProgramPlugin', path => this.outputUtil.get(path))
     // 添加额外文件
     compilation.hooks.additionalAssets.tapAsync('MiniProgramPlugin', callback => this.additionalAssets(compilation, callback))
@@ -171,7 +171,7 @@ module.exports = class MiniProgramPlugin extends Tapable {
    * 记录 js 文件被使用次数，不添加到 fileTree 是因为添加后会导致计算 deps 复杂
    * @param {*} chunks
    */
-  optimizeChunks (chunks) {
+  optimizeChunks (compilation, chunks) {
     const ignoreChunkNames = this.FileEntryPlugin.chunkNames
     const fileUsedTemp = {}
 
@@ -181,6 +181,12 @@ module.exports = class MiniProgramPlugin extends Tapable {
         for (const module of chunk.getModules()) {
           if (!module.isEntryModule()) {
             const resourcePath = module.resource
+            if (!resourcePath) {
+              compilation.warnings.push(
+                new Error('请不要动态 require 一个模块，或者使用内置模块')
+              )
+              continue
+            }
             let chunkName = chunk.name + '.js'
 
             const fileUsed = fileUsedTemp[resourcePath] = fileUsedTemp[resourcePath] || new Set()
