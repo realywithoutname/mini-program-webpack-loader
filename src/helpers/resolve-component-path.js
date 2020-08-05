@@ -36,9 +36,16 @@ function forEachComponentGenerics (componentGenerics, fn) {
 }
 
 async function resolveComponentsPath (resolver, request) {
-  const content = JSON.parse(
-    readFileSync(request, { encoding: 'utf8' })
-  )
+  let content = {}
+
+  try {
+    content = JSON.parse(
+      readFileSync(request, { encoding: 'utf8' })
+    )
+  } catch (error) {
+    console.log(error)
+  }
+
   const context = dirname(request)
   const components = new Map()
   const { componentGenerics, usingComponents, publicComponents } = content

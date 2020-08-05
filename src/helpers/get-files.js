@@ -20,3 +20,12 @@ exports.getFiles = (base, path = '', exts) => {
 
   return files
 }
+
+exports.getFile = (request) => {
+  const requestIndex = request.lastIndexOf('!')
+
+  if (requestIndex !== -1) {
+    request = request.substr(requestIndex + 1)
+  }
+  return request.split('?')[0]
+}

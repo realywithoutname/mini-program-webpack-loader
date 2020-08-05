@@ -7,7 +7,7 @@ const MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin')
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin')
 
 const { flattenDeep, isEmpty } = require('../utils')
-const { getFiles } = require('../helpers/get-files')
+const { getFiles, getFile } = require('../helpers/get-files')
 const { mergeEntrys } = require('../helpers/merge-entry')
 const { getAcceptPackages } = require('../helpers/parse-entry')
 const { createResolver } = require('../helpers/create-resolver')
@@ -119,7 +119,7 @@ module.exports = class FileEntryPlugin extends Tapable {
      * 获取所有 json 文件中对自定义组件的依赖
      */
     modules.forEach(module => {
-      const jsonPath = module.resource
+      const jsonPath = module.resource && getFile(module.resource)
 
       if (jsonPath && /\.json/.test(jsonPath)) {
         if ((lastTimestamps.get(jsonPath) || this.startTime) < (timestamps.get(jsonPath) || Infinity)) {
@@ -131,7 +131,7 @@ module.exports = class FileEntryPlugin extends Tapable {
             files = files.concat(newPageFiles)
           }
 
-          jsons.push(jsonPath)
+          jsons.push(getFile(jsonPath))
         }
       }
     })
@@ -489,7 +489,7 @@ module.exports = class FileEntryPlugin extends Tapable {
     }
 
     const newFiles = componentfiles.filter(
-      file => !this.miniLoader.fileTree.has(file)
+      file => !this.miniLoader.fileTree.has(getFile(file))
     )
 
     // 添加文件关系
@@ -504,7 +504,11 @@ module.exports = class FileEntryPlugin extends Tapable {
 
     files = flattenDeep(files)
 
-    files.forEach(file => /\.[j|t]s$/.test(file) ? scriptFiles.push(file) : assetFiles.push(file))
+    files.forEach(file => {
+      file = file + `?isEntry=true`
+      
+      return /\.[j|t]s$/.test(getFile(file)) ? scriptFiles.push(file) : assetFiles.push(file)
+    })
 
     this.addAssetsEntry(assetFiles)
     this.addScriptEntry(scriptFiles)
@@ -521,7 +525,8 @@ module.exports = class FileEntryPlugin extends Tapable {
 
   addScriptEntry (entrys) {
     for (const entry of entrys) {
-      let fileName = this.miniLoader.outputUtil.get(entry).replace(extname(entry), '')
+      const file = getFile(entry)
+      let fileName = this.miniLoader.outputUtil.get(file).replace(extname(file), '')
       new SingleEntryPlugin(this.context, entry, fileName).apply(this.compiler)
     }
   }

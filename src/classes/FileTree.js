@@ -1,6 +1,7 @@
 const { basename, dirname, join } = require('path')
 const { resolveTargetPath } = require('../helpers/resolve-target-path')
 const { relative } = require('../utils')
+const { getFile } = require('../helpers/get-files')
 
 /**
 FileNode: {
@@ -64,7 +65,7 @@ function getFileMeta (file, outputUtil) {
   }
 
   for (const key in regRules) {
-    if (new RegExp(`${key}`).test(file)) {
+    if (new RegExp(`${key}`).test(getFile(file))) {
       regRules[key].call(null, meta)
       break
     }

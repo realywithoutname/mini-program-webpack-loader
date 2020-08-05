@@ -1,5 +1,6 @@
 const { orderSource } = require('../helpers/resolve-dist-path')
 const { join, relative, isAbsolute } = require('path')
+const { getFile } = require('../helpers/get-files')
 
 module.exports = class OutPutPath {
   constructor (context, resources, outPath) {
@@ -11,6 +12,8 @@ module.exports = class OutPutPath {
   get (path) {
     let fullPath = this.compilerContext
     let npmReg = /node_modules/g
+
+    path = getFile(path)
 
     if (path === this.outputPath) return path
 
