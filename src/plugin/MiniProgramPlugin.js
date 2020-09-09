@@ -72,8 +72,10 @@ module.exports = class MiniProgramPlugin extends Tapable {
     this.compiler.miniLoader = this
     this.outputPath = compiler.options.output.path
 
-    this.miniEntrys = normalEntry(compiler.context, compiler.options.entry)
-    compiler.options.entry = { main: this.miniEntrys }
+    const rawEntrys = compiler.options.entry
+    let { normalEntrys, miniEntrys } = normalEntry(compiler.context, rawEntrys)
+
+    this.miniEntrys = miniEntrys
 
     const entryDirs = this.miniEntrys.map(entry => dirname(entry))
 
@@ -99,6 +101,13 @@ module.exports = class MiniProgramPlugin extends Tapable {
     compiler.hooks.compilation.tap('MiniProgramPlugin', this.setCompilation.bind(this))
     compiler.hooks.beforeCompile.tap('MiniProgramPlugin', this.beforeCompile.bind(this))
     compiler.hooks.emit.tapAsync('MiniProgramPlugin', this.setEmitHook.bind(this))
+
+    if (!normalEntrys) {
+      normalEntrys = { main: miniEntrys }
+      this.FileEntryPlugin.chunkNames.push('main')
+    }
+
+    compiler.options.entry = normalEntrys
   }
 
   setEnvHook () {

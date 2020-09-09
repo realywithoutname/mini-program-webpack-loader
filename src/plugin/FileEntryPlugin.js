@@ -35,7 +35,7 @@ module.exports = class FileEntryPlugin extends Tapable {
     this._mode = options.mode
     this.options = options
     this.mainEntry = null
-    this.chunkNames = ['main', 'miniapp-entry']
+    this.chunkNames = []
 
     this.hooks = {
       addPage: new SyncHook(['page', 'root']),
@@ -506,7 +506,7 @@ module.exports = class FileEntryPlugin extends Tapable {
 
     files.forEach(file => {
       file = file + `?isEntry=true`
-      
+
       return /\.[j|t]s$/.test(getFile(file)) ? scriptFiles.push(file) : assetFiles.push(file)
     })
 
