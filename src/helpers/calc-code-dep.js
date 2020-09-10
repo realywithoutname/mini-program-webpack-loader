@@ -1,7 +1,7 @@
 const target = process.env.TARGET || 'wx'
 const { ConcatSource } = require('webpack-sources')
-const { basename, dirname, join } = require('path')
-const { relative } = require('../utils')
+const { basename, dirname } = require('path')
+const { relative, join } = require('../utils')
 const { updateJsCode } = require('./update-code')
 const { resolveTargetPath } = require('./resolve-target-path')
 const { isNativeTag } = require(`../platform/${target}/wxml`)

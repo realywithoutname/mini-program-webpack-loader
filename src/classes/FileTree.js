@@ -1,6 +1,6 @@
-const { basename, dirname, join } = require('path')
+const { basename, dirname } = require('path')
 const { resolveTargetPath } = require('../helpers/resolve-target-path')
-const { relative } = require('../utils')
+const { relative, join } = require('../utils')
 const { getFile } = require('../helpers/get-files')
 
 /**

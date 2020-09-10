@@ -34,6 +34,10 @@ exports.relative = (from, to) => {
   return './' + relative(dirname(from), to).replace(/\\/g, '/')
 }
 
+exports.join = function (...rest) {
+  return require('path').posix.join(...rest)
+}
+
 exports.removeExt = (file) => {
   return join(
     dirname(file),

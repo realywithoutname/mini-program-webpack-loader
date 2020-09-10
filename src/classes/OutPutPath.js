@@ -39,7 +39,7 @@ module.exports = class OutPutPath {
     if (fullPath !== this.compilerContext) {
       for (let index = 0; index < this.sourceSet.length; index++) {
         const source = this.sourceSet[index]
-        let outPath = relative(source, fullPath)
+        let outPath = relative(source, fullPath).replace(/\\/g, '/')
 
         if (outPath && outPath.indexOf('..') === -1) {
           path = outPath
