@@ -40,7 +40,8 @@ module.exports = class FileEntryPlugin extends Tapable {
     this.hooks = {
       addPage: new SyncHook(['page', 'root']),
       addFiles: new SyncHook(['files']),
-      getAppJsonCode: new SyncWaterfallHook(['code'])
+      getAppJsonCode: new SyncWaterfallHook(['code']),
+      getAppXssExt: new SyncHook([])
     }
   }
 
@@ -159,9 +160,9 @@ module.exports = class FileEntryPlugin extends Tapable {
     }
 
     assets['app.wxss'] = this.getAppWxss(assets)
-    if (!assets['app.wxss']) {
+    if (!assets['app.wxss'] || !assets['app.wxss'].source()) {
       delete assets['app.wxss']
-      this.compilation.warnings.push('没有对应的 app.wxss 文件')
+      // this.compilation.warnings.push('没有对应的 app.wxss 文件')
     }
 
     assets['app.json'] = this.getAppJsonCode()
