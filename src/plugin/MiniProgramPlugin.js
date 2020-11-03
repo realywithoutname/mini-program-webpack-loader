@@ -34,6 +34,7 @@ const defaultOptions = {
   optimizeIgnoreDirs: [],
   optimizeMainPackage: true,
   setSubPackageCacheGroup: null,
+  computedAssetsFinish: null,
   entry: {
     // 入口文件的配置
     // ignore
@@ -391,6 +392,7 @@ module.exports = class MiniProgramPlugin extends Tapable {
 
     this.lastTimestamps = fileTimestamps
 
+    typeof this.options.computedAssetsFinish === 'function' && this.options.computedAssetsFinish.call(null, compilation)
     callback()
   }
 

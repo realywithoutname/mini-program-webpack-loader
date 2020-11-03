@@ -159,6 +159,7 @@ module.exports = class ModuleHelper {
    * @param {*} file
    */
   fileIsInSubPackage (file) {
+    const dist = this.miniLoader.outputUtil.get(file)
     const { packages } = this.fileEntryPlugin
     const reg = new RegExp(
       Object.keys(packages).filter(root => !!root).map(root => `/${root}/`).join('|')
@@ -171,7 +172,7 @@ module.exports = class ModuleHelper {
       const matchedPack = packages[packName]
 
       // 检查文件确实属于分包
-      if (matchedPack && file.indexOf(matchedPack.context) === 0 && file.substr(matchedPack.context.length + 1).indexOf(packName) === 0) {
+      if (matchedPack && dist.indexOf(packName) === 0) {
         return matched[0].substr(1)
       }
     }
