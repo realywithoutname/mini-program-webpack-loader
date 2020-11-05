@@ -33,8 +33,9 @@ module.exports = class MiniTemplate {
 
       // 抽取的公用代码，不使用这个render处理
       if (!chunk.entryModule || !chunk.entryModule.resource) {
-        return source
+        return bootstrapSource
       }
+
       const resource = getFile(chunk.entryModule.resource)
 
       const globalRequire = 'require'
