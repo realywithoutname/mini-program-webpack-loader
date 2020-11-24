@@ -25,7 +25,7 @@ module.exports = class OutPutPath {
       // 相对路径：webpack 最好生成的路径，打包入口外的文件都以 '_' 表示上级目录
       let pDirReg = /_\//g
 
-      while (pDirReg.test(path)) {
+      while (pDirReg.test(path) && pDirReg.lastIndex === 2) {
         path = path.substr(pDirReg.lastIndex)
         pDirReg.lastIndex = 0
         fullPath = join(fullPath, '../')
