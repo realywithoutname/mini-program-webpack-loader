@@ -24,6 +24,11 @@ module.exports = class OutPutPath {
     } else {
       // 相对路径：webpack 最好生成的路径，打包入口外的文件都以 '_' 表示上级目录
       let pDirReg = /_\//g
+      /**
+       * 在 context 目录外的文件，会被处理为 _/_/ 这样的路径
+       * 这里把以 _/ 开头的替换为 ../ 形式以计算输出路径。
+       * pDirReg.lastIndex === 2 判断是以 _/ 开头，否则会存在如果目录名为 xxx_/xxx.xx 的时候也会被匹配，导致输出异常
+       */
 
       while (pDirReg.test(path) && pDirReg.lastIndex === 2) {
         path = path.substr(pDirReg.lastIndex)
