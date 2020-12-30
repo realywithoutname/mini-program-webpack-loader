@@ -6,7 +6,7 @@ const { dirname, join, extname, basename } = require('path')
 const MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin')
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin')
 
-const { flattenDeep, isEmpty } = require('../utils')
+const { flattenDeep, isEmpty, getExportFilePath } = require('../utils')
 const { getFiles, getFile } = require('../helpers/get-files')
 const { mergeEntrys } = require('../helpers/merge-entry')
 const { getAcceptPackages } = require('../helpers/parse-entry')
@@ -60,8 +60,20 @@ module.exports = class FileEntryPlugin extends Tapable {
 
     // 根据已有的入口文件准备好最基础的 app.json 内容，并添加这些文件到 webpack 打包程序
     this.start()
+    // 支持 app.json plugins 中 export 字段
+    this.getExportFile()
     // 添加一些项目相关的额外文件到 webpack 打包程序
     this.loadProjectFiles()
+  }
+
+  getExportFile () {
+    const appCode = this.getAppJson()
+    const filePaths = getExportFilePath(appCode, this.context)
+
+    if (filePaths.length) {
+      this.miniLoader.fileTree.setFile(filePaths)
+      this.addScriptEntry(filePaths)
+    }
   }
 
   setCompilation (compilation) {

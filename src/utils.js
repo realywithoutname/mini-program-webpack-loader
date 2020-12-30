@@ -5,6 +5,7 @@ const {
   relative,
   basename
 } = require('path')
+const { existsSync } = require('fs')
 
 exports.camelCase = (str) => {
   let words = str.split(/[^a-zA-Z]/)
@@ -61,4 +62,27 @@ exports.forEachValue = (obj, cb) => {
   } else {
     throw Error('参数错误')
   }
+}
+
+/**
+ * @description 获取 app.json plugins 的 export 字段
+ */
+exports.getExportFilePath = function (appCode, context) {
+  let filePaths = []
+  if (!appCode.plugins) {
+    return filePaths
+  }
+
+  Object.keys(appCode.plugins).forEach(fileName => {
+    if (appCode.plugins[fileName]) {
+      const file = join(context, appCode.plugins[fileName].export)
+      if (existsSync(file)) {
+        filePaths.push(file)
+      } else {
+        throw new Error(`${file} 不存在，请检查 plugins 中的 export 字段在 ${context} 是否存在`)
+      }
+    }
+  })
+
+  return filePaths
 }
