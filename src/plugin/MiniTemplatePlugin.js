@@ -14,6 +14,7 @@ module.exports = class MiniTemplate {
   apply (compiler) {
     this.compiler = compiler
     this.targetIsUMD = compiler.options.output.libraryTarget === 'umd'
+    this.appCode = this.miniLoader.FileEntryPlugin.getAppJson()
 
     compiler.hooks.compilation.tap('MiniTemplate', (compilation) => {
       this.compilation = compilation
@@ -36,6 +37,8 @@ module.exports = class MiniTemplate {
         return bootstrapSource
       }
 
+      const filePaths = utils.getExportFilePath(this.appCode, this.compiler.context)
+
       const resource = getFile(chunk.entryModule.resource)
 
       const globalRequire = 'require'
@@ -52,6 +55,8 @@ module.exports = class MiniTemplate {
       this.targetIsUMD && source.add('(function() {\n')
 
       source.add(`var webpackRequire = ${webpackRequire};\n`)
+
+      filePaths.includes(resource) && source.add('module.exports = ')
 
       this.targetIsUMD && source.add('return ')
 
