@@ -74,7 +74,7 @@ exports.getExportFilePath = function (appCode, context) {
   }
 
   Object.keys(appCode.plugins).forEach(fileName => {
-    if (appCode.plugins[fileName]) {
+    if (appCode.plugins[fileName] && appCode.plugins[fileName].export) {
       const file = join(context, appCode.plugins[fileName].export)
       if (existsSync(file)) {
         filePaths.push(file)

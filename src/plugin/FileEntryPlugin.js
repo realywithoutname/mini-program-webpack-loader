@@ -67,7 +67,17 @@ module.exports = class FileEntryPlugin extends Tapable {
   }
 
   getExportFile () {
-    const appCode = this.getAppJson()
+    let appCode
+    const context = dirname(this.mainEntry)
+    const extPath = join(context, 'ext.json')
+
+    try {
+      appCode = JSON.parse(readFileSync(extPath, { encoding: 'utf-8' }))
+    } catch (error) {
+      console.error('FileEntryPlugin: ', '读取 app.json 失败')
+      throw new Error(error)
+    }
+
     const filePaths = getExportFilePath(appCode, this.context)
 
     if (filePaths.length) {
