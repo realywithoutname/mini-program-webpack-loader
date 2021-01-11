@@ -70,9 +70,13 @@ module.exports = class FileEntryPlugin extends Tapable {
     let appCode
     let extPath
 
+    if (this.options.extfile === false) {
+      return
+    }
     if (this.options.extfile === true) {
       extPath = join(this.context, 'ext.json')
-    } else {
+    }
+    if (typeof this.options.extfile === 'string') {
       extPath = join(this.context, this.options.extfile)
     }
 
