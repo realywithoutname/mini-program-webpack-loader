@@ -61,15 +61,20 @@ module.exports = class FileEntryPlugin extends Tapable {
     // 根据已有的入口文件准备好最基础的 app.json 内容，并添加这些文件到 webpack 打包程序
     this.start()
     // 支持 app.json plugins 中 export 字段
-    this.getExportFile()
+    this.setExportFile()
     // 添加一些项目相关的额外文件到 webpack 打包程序
     this.loadProjectFiles()
   }
 
-  getExportFile () {
+  setExportFile () {
     let appCode
-    const context = dirname(this.mainEntry)
-    const extPath = join(context, 'ext.json')
+    let extPath
+
+    if (this.options.extfile === true) {
+      extPath = join(this.context, 'ext.json')
+    } else {
+      extPath = join(this.context, this.options.extfile)
+    }
 
     try {
       appCode = JSON.parse(readFileSync(extPath, { encoding: 'utf-8' }))
