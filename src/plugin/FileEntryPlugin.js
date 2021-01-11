@@ -83,7 +83,7 @@ module.exports = class FileEntryPlugin extends Tapable {
     try {
       appCode = JSON.parse(readFileSync(extPath, { encoding: 'utf-8' }))
     } catch (error) {
-      console.error('FileEntryPlugin: ', '读取 app.json 失败')
+      console.error('FileEntryPlugin: ', '读取 ext.json 失败')
       throw new Error(error)
     }
 
