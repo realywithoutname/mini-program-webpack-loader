@@ -75,9 +75,9 @@ class MiniLoader {
 
   async loadNormalFileDeps () {
     let map = new Map()
-    let { isWxml, isWxss, isWxs } = this.fileMeta
+    let { isWxml, isWxss, isWxs, isJson } = this.fileMeta
 
-    if (!isWxml && !isWxs && !isWxss) {
+    if (!isWxml && !isWxs && !isWxss && !isJson) {
       console.log('webpack 配置不对哦，该插件只支持 wxml, wxss, wxs, json 的'.red)
       return map
     }
