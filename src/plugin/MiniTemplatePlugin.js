@@ -1,4 +1,5 @@
 const { join } = require('path')
+const { readFileSync } = require('fs')
 const { ConcatSource, RawSource } = require('webpack-sources')
 const requireCode = require('../lib/require')
 const utils = require('../utils')
@@ -14,7 +15,9 @@ module.exports = class MiniTemplate {
   apply (compiler) {
     this.compiler = compiler
     this.targetIsUMD = compiler.options.output.libraryTarget === 'umd'
-    this.appCode = this.miniLoader.FileEntryPlugin.getAppJson()
+    const extPath = utils.getExtPath(this.miniLoader.options.extfile, compiler.context)
+
+    this.appCode = extPath ? JSON.parse(readFileSync(extPath, { encoding: 'utf-8' })) : {}
 
     compiler.hooks.compilation.tap('MiniTemplate', (compilation) => {
       this.compilation = compilation

@@ -86,3 +86,22 @@ exports.getExportFilePath = function (appCode, context) {
 
   return filePaths
 }
+
+/**
+ * 
+ * @param {*} extfile ext 配置
+ * @param {*} context 执行上下文
+ * @description 获取 ext.json
+ */
+exports.getExtPath = function (extfile, context) {
+  if (extfile === false) {
+    return ''
+  }
+  if (extfile === true) {
+    return join(context, 'ext.json')
+  }
+  if (typeof extfile === 'string') {
+    return join(context, extfile)
+  }
+}
+
