@@ -27,6 +27,7 @@
     "console.table": "^0.10.0",
     "enhanced-resolve": "^4.1.0",
     "htmlparser2": "^3.9.2",
+    "domhandler": "^2.3.0",
     "lebab": "^3.0.3"
   }
 }
