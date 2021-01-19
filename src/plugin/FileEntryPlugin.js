@@ -421,7 +421,7 @@ module.exports = class FileEntryPlugin extends Tapable {
     }
     const files = getFiles(dir, fileName, exts)
 
-    this.addEntrys(files)
+    this.addEntrys(files, true)
     this.miniLoader.fileTree.addEntry(entry, files)
 
     this._row[entry] = JSON.parse(
@@ -530,14 +530,14 @@ module.exports = class FileEntryPlugin extends Tapable {
     return newFiles
   }
 
-  addEntrys (files) {
+  addEntrys (files, isApp) {
     let assetFiles = []
     let scriptFiles = []
 
     files = flattenDeep(files)
 
     files.forEach(file => {
-      file = file + `?isEntry=true`
+      file = file + `?isEntry=true&from=miniapp${isApp ? '&isApp' : ''}`
 
       return /\.[j|t]s$/.test(getFile(file)) ? scriptFiles.push(file) : assetFiles.push(file)
     })
