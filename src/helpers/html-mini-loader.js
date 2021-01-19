@@ -7,7 +7,7 @@ function trimWhitespace (str) {
 }
 
 function parseDOM (data, options) {
-  const handler = new DomHandler(options)
+  const handler = new (DomHandler.DomHandler || DomHandler)(options)
   const parser = new Parser(handler, options)
 
   parser.onattribend = function () {
