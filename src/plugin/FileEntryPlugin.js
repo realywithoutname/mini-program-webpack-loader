@@ -77,7 +77,7 @@ module.exports = class FileEntryPlugin extends Tapable {
       extPath = join(this.context, 'ext.json')
     }
     if (typeof this.options.extfile === 'string') {
-      extPath = join(this.context, this.options.extfile)
+      extPath = this.options.extfile
     }
 
     try {
