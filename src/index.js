@@ -5,6 +5,9 @@ const MiniLoader = require('./classes/Loader')
 
 /* eslint-disable */
 String.prototype.replaceAll = function (str, replacement) {
+  if (str === replacement) return this.toString();
+
+  str = str.replace(/\./g, '\\.')
   return this.replace(new RegExp(str, 'gm'), replacement)
 }
 

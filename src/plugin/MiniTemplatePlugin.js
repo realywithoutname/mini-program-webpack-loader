@@ -17,7 +17,7 @@ module.exports = class MiniTemplate {
     this.targetIsUMD = compiler.options.output.libraryTarget === 'umd'
     const extPath = utils.getExtPath(this.miniLoader.options.extfile, compiler.context)
 
-    this.appCode = extPath ? JSON.parse(readFileSync(extPath, { encoding: 'utf-8' })) : {}
+    this.extCode = extPath ? JSON.parse(readFileSync(extPath, { encoding: 'utf-8' })) : {}
 
     compiler.hooks.compilation.tap('MiniTemplate', (compilation) => {
       this.compilation = compilation
@@ -40,7 +40,7 @@ module.exports = class MiniTemplate {
         return bootstrapSource
       }
 
-      const filePaths = utils.getExportFilePath(this.appCode, this.compiler.context)
+      const filePaths = utils.getExportFilePath(this.extCode, this.compiler.context)
 
       const resource = getFile(chunk.entryModule.resource)
 
