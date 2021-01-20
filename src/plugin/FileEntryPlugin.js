@@ -6,7 +6,7 @@ const { dirname, join, extname, basename } = require('path')
 const MultiEntryPlugin = require('webpack/lib/MultiEntryPlugin')
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin')
 
-const { flattenDeep, isEmpty, getExportFilePath } = require('../utils')
+const { flattenDeep, isEmpty, getExportFilePath, getExtPath } = require('../utils')
 const { getFiles, getFile } = require('../helpers/get-files')
 const { mergeEntrys } = require('../helpers/merge-entry')
 const { getAcceptPackages } = require('../helpers/parse-entry')
@@ -68,16 +68,11 @@ module.exports = class FileEntryPlugin extends Tapable {
 
   setExportFile () {
     let appCode
-    let extPath
+    const extPath = getExtPath(this.options.extfile, this.context)
 
-    if (this.options.extfile === false) {
+    if (!extPath) {
+      // 没有 ext.json 时不进行后续逻辑
       return
-    }
-    if (this.options.extfile === true) {
-      extPath = join(this.context, 'ext.json')
-    }
-    if (typeof this.options.extfile === 'string') {
-      extPath = this.options.extfile
     }
 
     try {
