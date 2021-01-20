@@ -101,7 +101,8 @@ exports.getExtPath = function (extfile, context) {
     return join(context, 'ext.json')
   }
   if (typeof extfile === 'string') {
-    return join(context, extfile)
+    // options.extfile 是绝对路径，不需要 join
+    return extfile
   }
 }
 
