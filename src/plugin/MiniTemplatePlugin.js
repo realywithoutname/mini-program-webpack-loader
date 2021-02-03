@@ -4,6 +4,7 @@ const { ConcatSource, RawSource } = require('webpack-sources')
 const requireCode = require('../lib/require')
 const utils = require('../utils')
 const { getFile } = require('../helpers/get-files')
+const qs = require('querystring')
 
 module.exports = class MiniTemplate {
   constructor (miniLoader) {
@@ -27,7 +28,14 @@ module.exports = class MiniTemplate {
   }
 
   getRequirePath (entry) {
-    let entryPath = join(this.outPath, this.miniLoader.outputUtil.get(entry))
+    const [filePath, querystr] = entry.split('?')
+    const query = qs.parse(querystr)
+
+    const entryPath = join(
+      this.outPath,
+      query.output || this.miniLoader.outputUtil.get(filePath)
+    )
+
     return utils.relative(entryPath, this.requirePath)
   }
 
@@ -46,7 +54,7 @@ module.exports = class MiniTemplate {
 
       const globalRequire = 'require'
 
-      let webpackRequire = `${globalRequire}("${this.getRequirePath(resource)}")`
+      let webpackRequire = `${globalRequire}("${this.getRequirePath(chunk.entryModule.resource)}")`
       // 支持独立分包，先这样处理，render hook 添加的不对
       if (resource && this.miniLoader.fileTree.getFile(resource).independent) {
         webpackRequire = requireCode.toString() + ';\nvar installedModules = {}'

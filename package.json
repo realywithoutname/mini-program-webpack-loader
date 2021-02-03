@@ -1,6 +1,6 @@
 {
   "name": "mini-program-webpack-loader",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "description": "mini-program webpack loader",
   "main": "src/index.js",
   "scripts": {
@@ -32,6 +32,7 @@
     "domhandler": "^2.3.0",
     "enhanced-resolve": "^4.1.0",
     "htmlparser2": "^3.9.2",
-    "lebab": "^3.0.3"
+    "lebab": "^3.0.3",
+    "querystring": "^0.2.0"
   }
 }
