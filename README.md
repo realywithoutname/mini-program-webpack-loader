@@ -1,3 +1,6 @@
+> 由于很久没有写小程序了，所以这个工具可能不维护了
+
+
 ## mini-program-webpack-loader
 
 基于 webpack 4.0 的小程序打包工具。
